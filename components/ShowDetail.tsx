@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../lib/AuthContext';
 import { requireAuth } from '../lib/walletHelpers';
 import {
+    API_BASE_URL,
     fetchShowById,
     fetchComments,
     toggleLike,
@@ -473,7 +474,7 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
                         <form onSubmit={handleAddComment} className="mb-8">
                             <div className="flex gap-4">
                                 <img
-                                    src={userData.profile_picture || "https://picsum.photos/100/100"}
+                                    src={userData.profile_picture?.startsWith('http') ? userData.profile_picture : `${API_BASE_URL}${userData.profile_picture}` || "https://picsum.photos/100/100"}
                                     alt="Your avatar"
                                     className="w-10 h-10 rounded-full border-2 border-borderSubtle"
                                 />
@@ -500,13 +501,13 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
                     ) : (
                         <div className="mb-8 p-6 bg-surface rounded-xl text-center">
                             <p className="text-inkLight font-medium mb-3">
-                                Please login to join the conversation
+                                Please connect your wallet to join the conversation
                             </p>
                             <button
-                                onClick={() => onNavigate?.('login')}
+                                onClick={connectWallet}
                                 className="bg-gold-gradient text-ink font-bold px-6 py-2 rounded-full hover:shadow-lg transition-all"
                             >
-                                Login
+                                Connect Wallet
                             </button>
                         </div>
                     )}
@@ -524,7 +525,7 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
                             comments.map((comment) => (
                                 <div key={comment.id} className="flex gap-4 pb-6 border-b border-borderSubtle last:border-0">
                                     <img
-                                        src={comment.user.profile_picture || "https://picsum.photos/100/100"}
+                                        src={comment.user.profile_picture?.startsWith('http') ? comment.user.profile_picture : `${API_BASE_URL}${comment.user.profile_picture}` || "https://picsum.photos/100/100"}
                                         alt={comment.user.username}
                                         className="w-10 h-10 rounded-full border-2 border-borderSubtle"
                                     />
