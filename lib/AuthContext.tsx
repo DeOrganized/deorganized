@@ -80,23 +80,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsAuthenticating(true);
         setAuthError(null);
 
+        console.log('🔵 [AUTH] Starting wallet authentication for:', userData.address);
+
         try {
             const result = await checkWalletOrLogin(userData.address);
+            console.log('🔵 [AUTH] API Response:', { is_new: result.is_new, has_tokens: !!result.tokens, has_user: !!result.user });
 
             if (result.is_new) {
                 // New user - store wallet for setup and navigate to setup page
+                console.log('🟢 [AUTH] New user detected - navigating to setup');
                 storePendingWallet(userData.address);
                 onNewUser?.();
             } else {
                 // Existing user - store tokens and user data
+                console.log('🟢 [AUTH] Existing user detected');
                 if (result.tokens && result.user) {
+                    console.log('🟢 [AUTH] Storing tokens and user data...');
                     storeTokens(result.tokens);
                     storeUser(result.user);
                     setAccessToken(result.tokens.access);
                     setBackendUser(result.user);
-
-                    // Auto-refresh to update UI with authenticated state
-                    window.location.reload();
+                    console.log('🟢 [AUTH] Calling onExistingUser callback...');
+                    onExistingUser?.();
+                    console.log('🟢 [AUTH] Callback completed');
                 }
             }
         } catch (error: any) {
