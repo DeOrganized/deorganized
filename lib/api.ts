@@ -72,6 +72,7 @@ export interface ShowInstance {
 export interface User {
     id: number;
     username: string;
+    display_name?: string;
     email?: string;
     bio?: string;
     profile_picture: string | null;
