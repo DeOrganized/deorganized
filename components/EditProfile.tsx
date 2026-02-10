@@ -14,6 +14,7 @@ export const EditProfile: React.FC<EditProfileProps> = ({ onNavigate }) => {
 
     const [formData, setFormData] = useState({
         username: '',
+        display_name: '',
         bio: '',
         website: '',
         twitter: '',
@@ -44,6 +45,7 @@ export const EditProfile: React.FC<EditProfileProps> = ({ onNavigate }) => {
                 // Pre-populate form
                 setFormData({
                     username: user.username || '',
+                    display_name: user.display_name || '',
                     bio: user.bio || '',
                     website: user.website || '',
                     twitter: user.twitter || '',
@@ -94,6 +96,7 @@ export const EditProfile: React.FC<EditProfileProps> = ({ onNavigate }) => {
         try {
             const updateData = new FormData();
             updateData.append('username', formData.username);
+            updateData.append('display_name', formData.display_name);
             updateData.append('bio', formData.bio);
             updateData.append('website', formData.website);
             updateData.append('twitter', formData.twitter);
@@ -212,6 +215,24 @@ export const EditProfile: React.FC<EditProfileProps> = ({ onNavigate }) => {
                                 onChange={handleInputChange}
                                 required
                                 placeholder="Enter your username"
+                                className="w-full pl-12 pr-4 py-3 bg-surface border border-borderSubtle rounded-xl text-ink placeholder:text-inkLight/50 focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 transition-all"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Display Name */}
+                    <div className="mb-6">
+                        <label className="block text-sm font-bold text-ink mb-2">
+                            Display Name <span className="text-inkLight text-xs font-normal">(optional)</span>
+                        </label>
+                        <div className="relative">
+                            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-inkLight" />
+                            <input
+                                type="text"
+                                name="display_name"
+                                value={formData.display_name}
+                                onChange={handleInputChange}
+                                placeholder="Your display name"
                                 className="w-full pl-12 pr-4 py-3 bg-surface border border-borderSubtle rounded-xl text-ink placeholder:text-inkLight/50 focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 transition-all"
                             />
                         </div>
