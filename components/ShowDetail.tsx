@@ -474,7 +474,7 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
                         <form onSubmit={handleAddComment} className="mb-8">
                             <div className="flex gap-4">
                                 <img
-                                    src={userData.profile_picture?.startsWith('http') ? userData.profile_picture : `${API_BASE_URL}${userData.profile_picture}` || "https://picsum.photos/100/100"}
+                                    src={userData?.profile_picture || "https://picsum.photos/100/100"}
                                     alt="Your avatar"
                                     className="w-10 h-10 rounded-full border-2 border-borderSubtle"
                                 />
@@ -525,7 +525,7 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
                             comments.map((comment) => (
                                 <div key={comment.id} className="flex gap-4 pb-6 border-b border-borderSubtle last:border-0">
                                     <img
-                                        src={comment.user.profile_picture?.startsWith('http') ? comment.user.profile_picture : `${API_BASE_URL}${comment.user.profile_picture}` || "https://picsum.photos/100/100"}
+                                        src={comment.user.profile_picture || "https://picsum.photos/100/100"}
                                         alt={comment.user.username}
                                         className="w-10 h-10 rounded-full border-2 border-borderSubtle"
                                     />
