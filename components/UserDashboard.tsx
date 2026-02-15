@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
    User, Settings, Clock, Heart, Shield, Zap,
    LogOut, Play, MoreHorizontal, MessageSquare,
-   ThumbsUp, ExternalLink, CreditCard, Award, Loader2
+   ThumbsUp, ExternalLink, CreditCard, Award, Loader2,
+   UserPlus, Share2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../lib/AuthContext';
@@ -10,9 +11,11 @@ import {
    fetchUserProfile,
    fetchUserFollowing,
    getUserLikedShows,
+   fetchNotifications,
    UserProfile,
    Creator,
-   Show
+   Show,
+   Notification
 } from '../lib/api';
 
 interface UserDashboardProps {
@@ -32,9 +35,30 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
    const [isLoadingProfile, setIsLoadingProfile] = useState(true);
    const [isLoadingFollowing, setIsLoadingFollowing] = useState(true);
    const [isLoadingLiked, setIsLoadingLiked] = useState(true);
+   const [isLoadingActivity, setIsLoadingActivity] = useState(false);
+
+   // Activity feed
+   const [activities, setActivities] = useState<Notification[]>([]);
 
    // Error states
    const [profileError, setProfileError] = useState<string | null>(null);
+
+   // Load activity feed
+   useEffect(() => {
+      const loadActivity = async () => {
+         if (!accessToken || activeTab !== 'activity') return;
+         try {
+            setIsLoadingActivity(true);
+            const notifs = await fetchNotifications(accessToken);
+            setActivities(notifs);
+         } catch (error) {
+            console.error('Failed to load activity:', error);
+         } finally {
+            setIsLoadingActivity(false);
+         }
+      };
+      loadActivity();
+   }, [accessToken, activeTab]);
 
    // Fetch user profile data
    useEffect(() => {
@@ -358,11 +382,73 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                      )}
 
                      {activeTab === 'activity' && (
-                        <div className="text-center py-12">
-                           <Zap className="w-12 h-12 text-inkLight mx-auto mb-4" />
-                           <p className="text-inkLight text-sm">Activity feed coming soon!</p>
-                           <p className="text-xs text-inkLight mt-2">Track all your interactions here.</p>
-                        </div>
+                        <>
+                           {isLoadingActivity ? (
+                              <div className="flex items-center justify-center py-12">
+                                 <Loader2 className="w-8 h-8 text-gold animate-spin" />
+                              </div>
+                           ) : activities.length === 0 ? (
+                              <div className="text-center py-12">
+                                 <Zap className="w-12 h-12 text-inkLight mx-auto mb-4" />
+                                 <p className="text-inkLight text-sm">No activity yet.</p>
+                                 <p className="text-xs text-inkLight mt-2">Your interactions will show up here.</p>
+                              </div>
+                           ) : (
+                              <div className="space-y-3">
+                                 {activities.map((item) => {
+                                    const getIcon = () => {
+                                       switch (item.notification_type) {
+                                          case 'like': return <Heart className="w-4 h-4 text-red-500" />;
+                                          case 'comment': return <MessageSquare className="w-4 h-4 text-blue-500" />;
+                                          case 'follow': return <UserPlus className="w-4 h-4 text-green-500" />;
+                                          case 'share': return <Share2 className="w-4 h-4 text-purple-500" />;
+                                          default: return <Zap className="w-4 h-4 text-gold" />;
+                                       }
+                                    };
+                                    const getColor = () => {
+                                       switch (item.notification_type) {
+                                          case 'like': return 'bg-red-500/10';
+                                          case 'comment': return 'bg-blue-500/10';
+                                          case 'follow': return 'bg-green-500/10';
+                                          case 'share': return 'bg-purple-500/10';
+                                          default: return 'bg-gold/10';
+                                       }
+                                    };
+                                    const timeAgo = (dateStr: string) => {
+                                       const diff = Date.now() - new Date(dateStr).getTime();
+                                       const mins = Math.floor(diff / 60000);
+                                       if (mins < 60) return `${mins}m ago`;
+                                       const hours = Math.floor(mins / 60);
+                                       if (hours < 24) return `${hours}h ago`;
+                                       return `${Math.floor(hours / 24)}d ago`;
+                                    };
+                                    return (
+                                       <div
+                                          key={item.id}
+                                          className={`flex items-center gap-3 p-3 rounded-xl ${!item.is_read ? 'bg-gold/5 border border-gold/20' : 'bg-surface border border-borderSubtle'}`}
+                                       >
+                                          <div className={`w-9 h-9 rounded-full flex items-center justify-center ${getColor()}`}>
+                                             {getIcon()}
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                             <p className="text-sm text-ink">
+                                                <span className="font-bold">{typeof item.actor === 'object' ? item.actor.username : 'Someone'}</span>
+                                                {' '}{item.notification_type === 'like' ? 'liked your' : item.notification_type === 'comment' ? 'commented on your' : item.notification_type === 'follow' ? 'started following you' : 'shared your'}
+                                                {item.notification_type !== 'follow' && item.show_slug && (
+                                                   <span className="font-semibold text-gold"> {item.show_title || 'show'}</span>
+                                                )}
+                                             </p>
+                                             <p className="text-xs text-inkLight mt-0.5">{timeAgo(item.created_at)}</p>
+                                          </div>
+                                          {!item.is_read && (
+                                             <div className="w-2 h-2 rounded-full bg-gold flex-shrink-0" />
+                                          )}
+                                       </div>
+                                    );
+                                 })}
+                              </div>
+                           )}
+                        </>
                      )}
 
                   </div>

@@ -95,11 +95,36 @@ export const RealTimeCalendar: React.FC<RealTimeCalendarProps> = ({
         });
 
         const dayEvents = events.filter(event => {
-            try {
-                const eventDate = parseISO(event.start_date);
-                return isSameDay(eventDate, date);
-            } catch (error) {
-                return false;
+            if (!event.is_recurring) {
+                // For non-recurring events, check start_datetime
+                const startDt = event.start_datetime || event.start_date;
+                if (!startDt) return false;
+                try {
+                    const eventDate = parseISO(startDt);
+                    return isSameDay(eventDate, date);
+                } catch (error) {
+                    return false;
+                }
+            } else {
+                // For recurring events, check the recurrence pattern
+                switch (event.recurrence_type) {
+                    case 'DAILY':
+                        return true;
+
+                    case 'WEEKDAYS':
+                        return dayOfWeek >= 1 && dayOfWeek <= 5;
+
+                    case 'WEEKENDS':
+                        return dayOfWeek === 0 || dayOfWeek === 6;
+
+                    case 'SPECIFIC_DAY':
+                        if (event.day_of_week === null) return false;
+                        const frontendDay = event.day_of_week === 6 ? 0 : event.day_of_week + 1;
+                        return dayOfWeek === frontendDay;
+
+                    default:
+                        return false;
+                }
             }
         });
 

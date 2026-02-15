@@ -131,7 +131,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
 
   const navLinks = [
     { label: 'Shows', id: 'shows' },
-    { label: 'Creators', id: 'creators' }
+    { label: 'Creators', id: 'creators' },
+    { label: 'Calendar', id: 'event-calendar' }
   ];
 
   // Format wallet address for display - show BNS name if available

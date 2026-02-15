@@ -32,6 +32,7 @@ import {
 } from '../lib/api';
 import { RealTimeCalendar } from './RealTimeCalendar';
 import { EditShowModal } from './EditShowModal';
+import { EditEventModal } from './EditEventModal';
 import { TagInput } from './TagInput';
 
 interface CreatorDashboardProps {
@@ -83,6 +84,32 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
    // Edit show state
    const [showToEdit, setShowToEdit] = useState<Show | null>(null);
    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+   // Edit event state
+   const [eventToEdit, setEventToEdit] = useState<Event | null>(null);
+   const [isEditEventModalOpen, setIsEditEventModalOpen] = useState(false);
+
+   // Create mode toggle (show vs event)
+   const [createMode, setCreateMode] = useState<'show' | 'event'>('show');
+
+   // Event form state
+   const [eventFormData, setEventFormData] = useState({
+      title: '',
+      description: '',
+      start_datetime: '',
+      end_datetime: '',
+      venue_name: '',
+      address: '',
+      is_virtual: false,
+      meeting_link: '',
+      is_public: true,
+      banner_image: null as File | null,
+      is_recurring: false,
+      recurrence_type: undefined as 'SPECIFIC_DAY' | 'DAILY' | 'WEEKDAYS' | 'WEEKENDS' | undefined,
+      day_of_week: undefined as number | undefined,
+      scheduled_time: '',
+   });
+   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
 
    // Fetch creator profile
    useEffect(() => {
@@ -340,6 +367,23 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
       }
    };
 
+   const handleEditEvent = (event: Event) => {
+      setEventToEdit(event);
+      setIsEditEventModalOpen(true);
+   };
+
+   const handleEditEventSuccess = async () => {
+      // Refresh events list
+      if (backendUser?.id && accessToken) {
+         try {
+            const updated = await fetchCreatorEvents(backendUser.id, accessToken);
+            setEvents(updated);
+         } catch (error) {
+            console.error('Failed to refresh events:', error);
+         }
+      }
+   };
+
    if (!backendUser || backendUser.role !== 'creator') {
       return (
          <div className="min-h-screen pt-24 pb-20 container max-w-[1024px] mx-auto px-6 flex items-center justify-center">
@@ -480,18 +524,34 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
          <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Create Show Form */}
             <div className="bg-canvas border border-borderSubtle rounded-3xl p-6 shadow-soft h-fit">
+               {/* Toggle: Show vs Event */}
+               <div className="flex items-center gap-2 mb-4">
+                  <button
+                     onClick={() => { setCreateMode('show'); setFormError(null); setFormSuccess(false); }}
+                     className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${createMode === 'show' ? 'bg-gold text-white shadow' : 'bg-surface text-inkLight hover:text-ink'}`}
+                  >
+                     Show
+                  </button>
+                  <button
+                     onClick={() => { setCreateMode('event'); setFormError(null); setFormSuccess(false); }}
+                     className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${createMode === 'event' ? 'bg-gold text-white shadow' : 'bg-surface text-inkLight hover:text-ink'}`}
+                  >
+                     Event
+                  </button>
+               </div>
+
                <div className="flex items-center gap-2 mb-6">
                   <div className="p-2 bg-gold/10 rounded-lg text-gold">
                      <CalendarIcon className="w-5 h-5" />
                   </div>
-                  <h3 className="text-xl font-bold text-ink">Create Show</h3>
+                  <h3 className="text-xl font-bold text-ink">{createMode === 'show' ? 'Create Show' : 'Create Event'}</h3>
                </div>
 
                {/* Success Message */}
                {formSuccess && (
                   <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-medium flex items-center gap-2">
                      <Check className="w-4 h-4" />
-                     Show created successfully!
+                     {createMode === 'show' ? 'Show' : 'Event'} created successfully!
                   </div>
                )}
 
@@ -503,231 +563,399 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                   </div>
                )}
 
-               <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                     <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Show Title *</label>
-                     <input
-                        type="text"
-                        placeholder="e.g. DeFi Deep Dive"
-                        value={formData.title}
-                        onChange={(e) => handleFormChange('title', e.target.value)}
-                        className="w-full bg-surface border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors"
-                     />
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                     <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Description *</label>
-                     <textarea
-                        placeholder="Describe your show..."
-                        value={formData.description}
-                        onChange={(e) => handleFormChange('description', e.target.value)}
-                        rows={3}
-                        className="w-full bg-surface border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors resize-none"
-                     />
-                  </div>
-
-                  {/* Thumbnail Upload */}
-                  <div>
-                     <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Thumbnail (Optional)</label>
-                     <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        className="w-full text-sm text-inkLight file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gold file:text-white hover:file:bg-gold/90 cursor-pointer"
-                     />
-                     {formData.thumbnail && (
-                        <p className="text-xs text-green-600 mt-2">Selected: {formData.thumbnail.name}</p>
-                     )}
-                  </div>
-
-                  {/* Tags */}
-                  <div>
-                     <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Tags</label>
-                     <TagInput
-                        selectedTags={formData.tags}
-                        onChange={(tags) => setFormData({ ...formData, tags })}
-                        placeholder="Add tags (Bitcoin, Stacks, etc.)"
-                     />
-                  </div>
-
-                  {/* External Link (Watch Now) */}
-                  <div>
-                     <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">
-                        Watch Now Link <span className="text-inkLight/50 normal-case">(Optional)</span>
-                     </label>
-                     <div className="space-y-3">
-                        <select
-                           value={formData.link_platform}
-                           onChange={(e) => setFormData({ ...formData, link_platform: e.target.value as any })}
-                           className="w-full bg-canvas border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors"
-                        >
-                           <option value="">Select Platform</option>
-                           <option value="youtube">YouTube</option>
-                           <option value="twitter">Twitter/X</option>
-                           <option value="twitch">Twitch</option>
-                           <option value="rumble">Rumble</option>
-                           <option value="kick">Kick</option>
-                           <option value="other">Other</option>
-                        </select>
+               {createMode === 'show' && (
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                     <div>
+                        <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Show Title *</label>
                         <input
-                           type="url"
-                           value={formData.external_link}
-                           onChange={(e) => setFormData({ ...formData, external_link: e.target.value })}
-                           placeholder="https://youtube.com/watch?v=..."
-                           className="w-full bg-canvas border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors"
+                           type="text"
+                           placeholder="e.g. DeFi Deep Dive"
+                           value={formData.title}
+                           onChange={(e) => handleFormChange('title', e.target.value)}
+                           className="w-full bg-surface border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors"
                         />
                      </div>
-                  </div>
 
-                  {/* Recurring Toggle */}
-                  <div>
-                     <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                           type="checkbox"
-                           checked={formData.is_recurring}
-                           onChange={(e) => handleFormChange('is_recurring', e.target.checked)}
-                           className="w-4 h-4 text-gold border-gray-300 rounded focus:ring-gold"
+                     {/* Description */}
+                     <div>
+                        <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Description *</label>
+                        <textarea
+                           placeholder="Describe your show..."
+                           value={formData.description}
+                           onChange={(e) => handleFormChange('description', e.target.value)}
+                           rows={3}
+                           className="w-full bg-surface border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors resize-none"
                         />
-                        <span className="text-sm font-bold text-ink flex items-center gap-1">
-                           <Repeat className="w-3 h-3" /> Recurring Show
-                        </span>
-                     </label>
-                  </div>
+                     </div>
 
-                  {/* Recurring Options - Only show if recurring is checked */}
-                  {formData.is_recurring && (
-                     <div className="space-y-4 p-4 bg-surface/50 rounded-xl border border-borderSubtle">
-                        {/* Recurrence Pattern */}
-                        <div>
-                           <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Recurrence Pattern *</label>
-                           <div className="grid grid-cols-2 gap-2">
-                              <button
-                                 type="button"
-                                 onClick={() => setFormData({ ...formData, recurrence_type: 'DAILY', day_of_week: undefined })}
-                                 className={`py-2 px-3 rounded-lg text-sm font-bold transition-colors ${formData.recurrence_type === 'DAILY'
-                                    ? 'bg-gold text-white'
-                                    : 'bg-canvas border border-borderSubtle text-inkLight hover:border-gold'
-                                    }`}
-                              >
-                                 Daily
-                              </button>
-                              <button
-                                 type="button"
-                                 onClick={() => setFormData({ ...formData, recurrence_type: 'WEEKDAYS', day_of_week: undefined })}
-                                 className={`py-2 px-3 rounded-lg text-sm font-bold transition-colors ${formData.recurrence_type === 'WEEKDAYS'
-                                    ? 'bg-gold text-white'
-                                    : 'bg-canvas border border-borderSubtle text-inkLight hover:border-gold'
-                                    }`}
-                              >
-                                 Weekdays
-                              </button>
-                              <button
-                                 type="button"
-                                 onClick={() => setFormData({ ...formData, recurrence_type: 'WEEKENDS', day_of_week: undefined })}
-                                 className={`py-2 px-3 rounded-lg text-sm font-bold transition-colors ${formData.recurrence_type === 'WEEKENDS'
-                                    ? 'bg-gold text-white'
-                                    : 'bg-canvas border border-borderSubtle text-inkLight hover:border-gold'
-                                    }`}
-                              >
-                                 Weekends
-                              </button>
-                              <button
-                                 type="button"
-                                 onClick={() => setFormData({ ...formData, recurrence_type: 'SPECIFIC_DAY' })}
-                                 className={`py-2 px-3 rounded-lg text-sm font-bold transition-colors ${formData.recurrence_type === 'SPECIFIC_DAY'
-                                    ? 'bg-gold text-white'
-                                    : 'bg-canvas border border-borderSubtle text-inkLight hover:border-gold'
-                                    }`}
-                              >
-                                 Specific Day
-                              </button>
-                           </div>
-                        </div>
-
-                        {/* Day of Week - Only for Specific Day */}
-                        {formData.recurrence_type === 'SPECIFIC_DAY' && (
-                           <div>
-                              <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Day of Week *</label>
-                              <div className="relative">
-                                 <select
-                                    value={formData.day_of_week ?? ''}
-                                    onChange={(e) => handleFormChange('day_of_week', parseInt(e.target.value))}
-                                    className="w-full appearance-none bg-canvas border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors text-ink cursor-pointer"
-                                 >
-                                    <option value="">Select day</option>
-                                    <option value="0">Monday</option>
-                                    <option value="1">Tuesday</option>
-                                    <option value="2">Wednesday</option>
-                                    <option value="3">Thursday</option>
-                                    <option value="4">Friday</option>
-                                    <option value="5">Saturday</option>
-                                    <option value="6">Sunday</option>
-                                 </select>
-                                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-inkLight pointer-events-none" />
-                              </div>
-                           </div>
+                     {/* Thumbnail Upload */}
+                     <div>
+                        <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Thumbnail (Optional)</label>
+                        <input
+                           type="file"
+                           accept="image/*"
+                           onChange={handleFileChange}
+                           className="w-full text-sm text-inkLight file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gold file:text-white hover:file:bg-gold/90 cursor-pointer"
+                        />
+                        {formData.thumbnail && (
+                           <p className="text-xs text-green-600 mt-2">Selected: {formData.thumbnail.name}</p>
                         )}
+                     </div>
 
-                        {/* Time */}
-                        <div>
-                           <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Time *</label>
+                     {/* Tags */}
+                     <div>
+                        <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Tags</label>
+                        <TagInput
+                           selectedTags={formData.tags}
+                           onChange={(tags) => setFormData({ ...formData, tags })}
+                           placeholder="Add tags (Bitcoin, Stacks, etc.)"
+                        />
+                     </div>
+
+                     {/* External Link (Watch Now) */}
+                     <div>
+                        <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">
+                           Watch Now Link <span className="text-inkLight/50 normal-case">(Optional)</span>
+                        </label>
+                        <div className="space-y-3">
+                           <select
+                              value={formData.link_platform}
+                              onChange={(e) => setFormData({ ...formData, link_platform: e.target.value as any })}
+                              className="w-full bg-canvas border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors"
+                           >
+                              <option value="">Select Platform</option>
+                              <option value="youtube">YouTube</option>
+                              <option value="twitter">Twitter/X</option>
+                              <option value="twitch">Twitch</option>
+                              <option value="rumble">Rumble</option>
+                              <option value="kick">Kick</option>
+                              <option value="other">Other</option>
+                           </select>
                            <input
-                              type="time"
-                              value={formData.scheduled_time}
-                              onChange={(e) => handleFormChange('scheduled_time', e.target.value)}
+                              type="url"
+                              value={formData.external_link}
+                              onChange={(e) => setFormData({ ...formData, external_link: e.target.value })}
+                              placeholder="https://youtube.com/watch?v=..."
                               className="w-full bg-canvas border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors"
                            />
                         </div>
                      </div>
-                  )}
 
-                  {/* Status Toggle */}
-                  <div>
-                     <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Status</label>
-                     <div className="flex gap-2">
-                        <button
-                           type="button"
-                           onClick={() => handleFormChange('status', 'draft')}
-                           className={`flex-1 py-2 rounded-lg text-sm font-bold transition-colors ${formData.status === 'draft'
-                              ? 'bg-transparent border border-ink text-ink'
-                              : 'bg-surface text-inkLight hover:bg-surface'
-                              }`}
-                        >
-                           Draft
-                        </button>
-                        <button
-                           type="button"
-                           onClick={() => handleFormChange('status', 'published')}
-                           className={`flex-1 py-2 rounded-lg text-sm font-bold transition-colors ${formData.status === 'published'
-                              ? 'bg-gold text-white'
-                              : 'bg-surface text-inkLight hover:bg-surface'
-                              }`}
-                        >
-                           Published
-                        </button>
+                     {/* Recurring Toggle */}
+                     <div>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                           <input
+                              type="checkbox"
+                              checked={formData.is_recurring}
+                              onChange={(e) => handleFormChange('is_recurring', e.target.checked)}
+                              className="w-4 h-4 text-gold border-gray-300 rounded focus:ring-gold"
+                           />
+                           <span className="text-sm font-bold text-ink flex items-center gap-1">
+                              <Repeat className="w-3 h-3" /> Recurring Show
+                           </span>
+                        </label>
                      </div>
-                  </div>
 
-                  {/* Submit Button */}
-                  <button
-                     type="submit"
-                     disabled={isSubmitting}
-                     className="w-full bg-gold-gradient text-white font-bold py-3.5 rounded-xl shadow-lg shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all mt-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                     {isSubmitting ? (
-                        <>
-                           <Loader2 className="w-4 h-4 animate-spin" />
-                           Creating...
-                        </>
-                     ) : (
-                        <>
-                           <Plus className="w-4 h-4" />
-                           Create Show
-                        </>
+                     {/* Recurring Options - Only show if recurring is checked */}
+                     {formData.is_recurring && (
+                        <div className="space-y-4 p-4 bg-surface/50 rounded-xl border border-borderSubtle">
+                           {/* Recurrence Pattern */}
+                           <div>
+                              <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Recurrence Pattern *</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                 <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, recurrence_type: 'DAILY', day_of_week: undefined })}
+                                    className={`py-2 px-3 rounded-lg text-sm font-bold transition-colors ${formData.recurrence_type === 'DAILY'
+                                       ? 'bg-gold text-white'
+                                       : 'bg-canvas border border-borderSubtle text-inkLight hover:border-gold'
+                                       }`}
+                                 >
+                                    Daily
+                                 </button>
+                                 <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, recurrence_type: 'WEEKDAYS', day_of_week: undefined })}
+                                    className={`py-2 px-3 rounded-lg text-sm font-bold transition-colors ${formData.recurrence_type === 'WEEKDAYS'
+                                       ? 'bg-gold text-white'
+                                       : 'bg-canvas border border-borderSubtle text-inkLight hover:border-gold'
+                                       }`}
+                                 >
+                                    Weekdays
+                                 </button>
+                                 <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, recurrence_type: 'WEEKENDS', day_of_week: undefined })}
+                                    className={`py-2 px-3 rounded-lg text-sm font-bold transition-colors ${formData.recurrence_type === 'WEEKENDS'
+                                       ? 'bg-gold text-white'
+                                       : 'bg-canvas border border-borderSubtle text-inkLight hover:border-gold'
+                                       }`}
+                                 >
+                                    Weekends
+                                 </button>
+                                 <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, recurrence_type: 'SPECIFIC_DAY' })}
+                                    className={`py-2 px-3 rounded-lg text-sm font-bold transition-colors ${formData.recurrence_type === 'SPECIFIC_DAY'
+                                       ? 'bg-gold text-white'
+                                       : 'bg-canvas border border-borderSubtle text-inkLight hover:border-gold'
+                                       }`}
+                                 >
+                                    Specific Day
+                                 </button>
+                              </div>
+                           </div>
+
+                           {/* Day of Week - Only for Specific Day */}
+                           {formData.recurrence_type === 'SPECIFIC_DAY' && (
+                              <div>
+                                 <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Day of Week *</label>
+                                 <div className="relative">
+                                    <select
+                                       value={formData.day_of_week ?? ''}
+                                       onChange={(e) => handleFormChange('day_of_week', parseInt(e.target.value))}
+                                       className="w-full appearance-none bg-canvas border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors text-ink cursor-pointer"
+                                    >
+                                       <option value="">Select day</option>
+                                       <option value="0">Monday</option>
+                                       <option value="1">Tuesday</option>
+                                       <option value="2">Wednesday</option>
+                                       <option value="3">Thursday</option>
+                                       <option value="4">Friday</option>
+                                       <option value="5">Saturday</option>
+                                       <option value="6">Sunday</option>
+                                    </select>
+                                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-inkLight pointer-events-none" />
+                                 </div>
+                              </div>
+                           )}
+
+                           {/* Time */}
+                           <div>
+                              <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Time *</label>
+                              <input
+                                 type="time"
+                                 value={formData.scheduled_time}
+                                 onChange={(e) => handleFormChange('scheduled_time', e.target.value)}
+                                 className="w-full bg-canvas border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors"
+                              />
+                           </div>
+                        </div>
                      )}
-                  </button>
-               </form>
+
+                     {/* Status Toggle */}
+                     <div>
+                        <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Status</label>
+                        <div className="flex gap-2">
+                           <button
+                              type="button"
+                              onClick={() => handleFormChange('status', 'draft')}
+                              className={`flex-1 py-2 rounded-lg text-sm font-bold transition-colors ${formData.status === 'draft'
+                                 ? 'bg-transparent border border-ink text-ink'
+                                 : 'bg-surface text-inkLight hover:bg-surface'
+                                 }`}
+                           >
+                              Draft
+                           </button>
+                           <button
+                              type="button"
+                              onClick={() => handleFormChange('status', 'published')}
+                              className={`flex-1 py-2 rounded-lg text-sm font-bold transition-colors ${formData.status === 'published'
+                                 ? 'bg-gold text-white'
+                                 : 'bg-surface text-inkLight hover:bg-surface'
+                                 }`}
+                           >
+                              Published
+                           </button>
+                        </div>
+                     </div>
+
+                     {/* Submit Button */}
+                     <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="w-full bg-gold-gradient text-white font-bold py-3.5 rounded-xl shadow-lg shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all mt-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                     >
+                        {isSubmitting ? (
+                           <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Creating...
+                           </>
+                        ) : (
+                           <>
+                              <Plus className="w-4 h-4" />
+                              Create Show
+                           </>
+                        )}
+                     </button>
+                  </form>
+               )}
+
+               {/* Event Form (hidden when createMode is 'show') */}
+               {createMode === 'event' && (
+                  <form onSubmit={async (e) => {
+                     e.preventDefault();
+                     if (!accessToken) { setFormError('You must be logged in'); return; }
+                     if (!eventFormData.title.trim()) { setFormError('Title is required'); return; }
+                     // Validate based on event type
+                     if (eventFormData.is_recurring) {
+                        if (!eventFormData.recurrence_type) { setFormError('Recurrence pattern is required'); return; }
+                        if (!eventFormData.scheduled_time) { setFormError('Scheduled time is required for recurring events'); return; }
+                        if (eventFormData.recurrence_type === 'SPECIFIC_DAY' && eventFormData.day_of_week === undefined) { setFormError('Day of week is required'); return; }
+                     } else {
+                        if (!eventFormData.start_datetime) { setFormError('Start date/time is required'); return; }
+                     }
+                     try {
+                        setIsSubmittingEvent(true);
+                        setFormError(null);
+                        const { createEvent } = await import('../lib/api');
+                        await createEvent({
+                           title: eventFormData.title,
+                           description: eventFormData.description,
+                           start_datetime: eventFormData.start_datetime || undefined,
+                           end_datetime: eventFormData.end_datetime || undefined,
+                           venue_name: eventFormData.venue_name,
+                           address: eventFormData.address,
+                           is_virtual: eventFormData.is_virtual,
+                           meeting_link: eventFormData.meeting_link || undefined,
+                           is_public: eventFormData.is_public,
+                           banner_image: eventFormData.banner_image || undefined,
+                           is_recurring: eventFormData.is_recurring,
+                           recurrence_type: eventFormData.is_recurring ? eventFormData.recurrence_type : undefined,
+                           day_of_week: eventFormData.is_recurring && eventFormData.recurrence_type === 'SPECIFIC_DAY' ? eventFormData.day_of_week : undefined,
+                           scheduled_time: eventFormData.is_recurring ? eventFormData.scheduled_time || undefined : undefined,
+                        }, accessToken);
+                        setFormSuccess(true);
+                        setEventFormData({ title: '', description: '', start_datetime: '', end_datetime: '', venue_name: '', address: '', is_virtual: false, meeting_link: '', is_public: true, banner_image: null, is_recurring: false, recurrence_type: undefined, day_of_week: undefined, scheduled_time: '' });
+                        setTimeout(() => setFormSuccess(false), 3000);
+                     } catch (err: any) {
+                        setFormError(err.message || 'Failed to create event');
+                     } finally {
+                        setIsSubmittingEvent(false);
+                     }
+                  }} className="space-y-4">
+                     <div>
+                        <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Event Title *</label>
+                        <input type="text" placeholder="e.g. Bitcoin Meetup" value={eventFormData.title}
+                           onChange={(e) => setEventFormData(prev => ({ ...prev, title: e.target.value }))}
+                           className="w-full bg-surface border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors" />
+                     </div>
+                     <div>
+                        <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Description</label>
+                        <textarea placeholder="Describe your event..." value={eventFormData.description}
+                           onChange={(e) => setEventFormData(prev => ({ ...prev, description: e.target.value }))}
+                           rows={3} className="w-full bg-surface border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors resize-none" />
+                     </div>
+                     {/* Only show date pickers for one-off events */}
+                     {!eventFormData.is_recurring && (
+                        <div className="grid grid-cols-2 gap-3">
+                           <div>
+                              <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Start *</label>
+                              <input type="datetime-local" value={eventFormData.start_datetime}
+                                 onChange={(e) => setEventFormData(prev => ({ ...prev, start_datetime: e.target.value }))}
+                                 className="w-full bg-surface border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors" />
+                           </div>
+                           <div>
+                              <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">End</label>
+                              <input type="datetime-local" value={eventFormData.end_datetime}
+                                 onChange={(e) => setEventFormData(prev => ({ ...prev, end_datetime: e.target.value }))}
+                                 className="w-full bg-surface border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors" />
+                           </div>
+                        </div>
+                     )}
+                     <div>
+                        <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Venue Name</label>
+                        <input type="text" placeholder="e.g. Community Center" value={eventFormData.venue_name}
+                           onChange={(e) => setEventFormData(prev => ({ ...prev, venue_name: e.target.value }))}
+                           className="w-full bg-surface border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors" />
+                     </div>
+                     <div>
+                        <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Address</label>
+                        <input type="text" placeholder="123 Main St" value={eventFormData.address}
+                           onChange={(e) => setEventFormData(prev => ({ ...prev, address: e.target.value }))}
+                           className="w-full bg-surface border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors" />
+                     </div>
+                     <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                           <input type="checkbox" checked={eventFormData.is_virtual}
+                              onChange={(e) => setEventFormData(prev => ({ ...prev, is_virtual: e.target.checked }))}
+                              className="w-4 h-4 text-gold border-gray-300 rounded focus:ring-gold" />
+                           <span className="text-sm font-bold text-ink">Virtual Event</span>
+                        </label>
+                     </div>
+
+                     {/* Recurring Toggle */}
+                     <div>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                           <input type="checkbox" checked={eventFormData.is_recurring}
+                              onChange={(e) => setEventFormData(prev => ({ ...prev, is_recurring: e.target.checked, recurrence_type: undefined, day_of_week: undefined, scheduled_time: '' }))}
+                              className="w-4 h-4 text-gold border-gray-300 rounded focus:ring-gold" />
+                           <span className="text-sm font-bold text-ink flex items-center gap-1">
+                              <Repeat className="w-3 h-3" /> Recurring Event
+                           </span>
+                        </label>
+                     </div>
+
+                     {/* Recurring Options */}
+                     {eventFormData.is_recurring && (
+                        <div className="space-y-4 p-4 bg-surface/50 rounded-xl border border-borderSubtle">
+                           <div>
+                              <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Recurrence Pattern *</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                 {(['DAILY', 'WEEKDAYS', 'WEEKENDS', 'SPECIFIC_DAY'] as const).map(type => (
+                                    <button key={type} type="button"
+                                       onClick={() => setEventFormData(prev => ({ ...prev, recurrence_type: type, day_of_week: type !== 'SPECIFIC_DAY' ? undefined : prev.day_of_week }))}
+                                       className={`py-2 px-3 rounded-lg text-sm font-bold transition-colors ${eventFormData.recurrence_type === type ? 'bg-gold text-white' : 'bg-canvas border border-borderSubtle text-inkLight hover:border-gold'}`}>
+                                       {type === 'SPECIFIC_DAY' ? 'Specific Day' : type.charAt(0) + type.slice(1).toLowerCase()}
+                                    </button>
+                                 ))}
+                              </div>
+                           </div>
+                           {eventFormData.recurrence_type === 'SPECIFIC_DAY' && (
+                              <div>
+                                 <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Day of Week *</label>
+                                 <select value={eventFormData.day_of_week ?? ''}
+                                    onChange={(e) => setEventFormData(prev => ({ ...prev, day_of_week: parseInt(e.target.value) }))}
+                                    className="w-full bg-canvas border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors">
+                                    <option value="">Select day</option>
+                                    <option value="0">Sunday</option>
+                                    <option value="1">Monday</option>
+                                    <option value="2">Tuesday</option>
+                                    <option value="3">Wednesday</option>
+                                    <option value="4">Thursday</option>
+                                    <option value="5">Friday</option>
+                                    <option value="6">Saturday</option>
+                                 </select>
+                              </div>
+                           )}
+                           <div>
+                              <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Time *</label>
+                              <input type="time" value={eventFormData.scheduled_time}
+                                 onChange={(e) => setEventFormData(prev => ({ ...prev, scheduled_time: e.target.value }))}
+                                 className="w-full bg-canvas border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors" />
+                           </div>
+                        </div>
+                     )}
+                     {eventFormData.is_virtual && (
+                        <div>
+                           <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Meeting Link</label>
+                           <input type="url" placeholder="https://zoom.us/..." value={eventFormData.meeting_link}
+                              onChange={(e) => setEventFormData(prev => ({ ...prev, meeting_link: e.target.value }))}
+                              className="w-full bg-surface border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors" />
+                        </div>
+                     )}
+                     <div>
+                        <label className="block text-xs font-bold text-inkLight uppercase tracking-wide mb-2">Banner Image (Optional)</label>
+                        <input type="file" accept="image/*"
+                           onChange={(e) => { if (e.target.files?.[0]) setEventFormData(prev => ({ ...prev, banner_image: e.target.files![0] })); }}
+                           className="w-full text-sm text-inkLight file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gold file:text-white hover:file:bg-gold/90 cursor-pointer" />
+                     </div>
+                     <button type="submit" disabled={isSubmittingEvent}
+                        className="w-full bg-gold-gradient text-white font-bold py-3.5 rounded-xl shadow-lg shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all mt-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                        {isSubmittingEvent ? (<><Loader2 className="w-4 h-4 animate-spin" /> Creating...</>) : (<><Plus className="w-4 h-4" /> Create Event</>)}
+                     </button>
+                  </form>
+               )}
             </div>
 
             {/* RealTime Calendar View */}
@@ -1089,6 +1317,80 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
             )}
          </section>
 
+         {/* 6. Recent Events with Stats */}
+         <section className="bg-canvas border border-borderSubtle rounded-3xl p-6 shadow-soft">
+            <div className="flex justify-between items-center mb-6">
+               <h3 className="text-xl font-bold text-ink">Your Events</h3>
+               <button className="text-xs font-bold text-gold hover:underline">View All</button>
+            </div>
+
+            {isLoadingEvents ? (
+               <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 text-gold animate-spin" />
+               </div>
+            ) : events.length === 0 ? (
+               <div className="text-center py-12">
+                  <CalendarIcon className="w-12 h-12 text-inkLight mx-auto mb-4" />
+                  <p className="text-inkLight text-sm">No events yet.</p>
+                  <p className="text-xs text-inkLight mt-2">Create your first event to get started!</p>
+               </div>
+            ) : (
+               <div className="space-y-4">
+                  {events.slice(0, 5).map(event => (
+                     <div key={event.id} className="flex items-center gap-4 p-4 border border-borderSubtle rounded-xl hover:bg-surface transition-colors cursor-pointer"
+                        onClick={() => onNavigate('event-detail', String(event.id))}
+                     >
+                        <div className="w-20 aspect-video rounded-lg overflow-hidden bg-surface shrink-0">
+                           {event.banner_image ? (
+                              <img src={event.banner_image} alt={event.title} className="w-full h-full object-cover" />
+                           ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-purple-500/10">
+                                 <CalendarIcon className="w-6 h-6 text-purple-500" />
+                              </div>
+                           )}
+                        </div>
+                        <div className="flex-1">
+                           <h4 className="font-bold text-ink text-sm mb-1">{event.title}</h4>
+                           <div className="flex items-center gap-4 text-xs text-inkLight">
+                              <span className="flex items-center gap-1">
+                                 <Heart className="w-3 h-3" /> {event.like_count}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                 <MessageSquare className="w-3 h-3" /> {event.comment_count}
+                              </span>
+                              {event.is_recurring && (
+                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700">
+                                    {event.recurrence_type === 'DAILY' ? 'Daily' :
+                                       event.recurrence_type === 'WEEKDAYS' ? 'Weekdays' :
+                                          event.recurrence_type === 'WEEKENDS' ? 'Weekends' :
+                                             event.recurrence_type === 'SPECIFIC_DAY' ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][event.day_of_week || 0] : 'Recurring'}
+                                 </span>
+                              )}
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${event.status === 'upcoming' ? 'bg-green-50 text-green-700' :
+                                 event.status === 'ongoing' ? 'bg-blue-50 text-blue-700' :
+                                    event.status === 'past' ? 'bg-surface text-inkLight' :
+                                       'bg-yellow-50 text-yellow-700'
+                                 }`}>
+                                 {event.status}
+                              </span>
+                           </div>
+                        </div>
+                        <button
+                           onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditEvent(event);
+                           }}
+                           className="text-inkLight hover:text-gold transition-colors"
+                           title="Edit event"
+                        >
+                           <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                     </div>
+                  ))}
+               </div>
+            )}
+         </section>
+
          {/* Toast Notification */}
          {showSuccessToast && (
             <motion.div
@@ -1122,6 +1424,19 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                   setShowToEdit(null);
                }}
                onSuccess={handleEditSuccess}
+            />
+         )}
+
+         {/* Edit Event Modal */}
+         {eventToEdit && (
+            <EditEventModal
+               event={eventToEdit}
+               isOpen={isEditEventModalOpen}
+               onClose={() => {
+                  setIsEditEventModalOpen(false);
+                  setEventToEdit(null);
+               }}
+               onSuccess={handleEditEventSuccess}
             />
          )}
 

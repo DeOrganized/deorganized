@@ -14,9 +14,12 @@ import { ShowDetail } from './components/ShowDetail';
 import { CreatorDetail } from './components/CreatorDetail';
 import { ProfileSetup } from './components/ProfileSetup';
 import { EditProfile } from './components/EditProfile';
+import { EventCalendar } from './components/EventCalendar';
+import { EventDetail } from './components/EventDetail';
+import { FeedbackPopup } from './components/FeedbackPopup';
 
 
-type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile';
+type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail';
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<PageView>('home');
@@ -49,6 +52,10 @@ const AppContent: React.FC = () => {
         return selectedId ? <ShowDetail onNavigate={handleNavigate} showId={String(selectedId)} /> : <div>Show not found</div>;
       case 'creator-detail':
         return selectedId ? <CreatorDetail onNavigate={handleNavigate} creatorId={Number(selectedId)} /> : <div>Creator not found</div>;
+      case 'event-calendar':
+        return <EventCalendar onNavigate={handleNavigate} />;
+      case 'event-detail':
+        return selectedId ? <EventDetail onNavigate={handleNavigate} eventId={Number(selectedId)} /> : <div>Event not found</div>;
       case 'edit-profile':
         return <EditProfile onNavigate={handleNavigate} />;
       case 'register':
@@ -86,6 +93,7 @@ const AppContent: React.FC = () => {
         {renderContent()}
       </main>
       <Footer onNavigate={handleNavigate} />
+      <FeedbackPopup />
     </div>
   );
 };

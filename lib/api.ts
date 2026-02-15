@@ -42,17 +42,23 @@ export interface Show {
 
 export interface Notification {
     id: number;
-    notification_type: 'follow' | 'like' | 'comment' | 'show_reminder' | 'show_cancelled' | 'guest_request' | 'guest_accepted' | 'guest_declined';
+    notification_type: 'follow' | 'like' | 'comment' | 'share' | 'show_reminder' | 'show_cancelled' | 'guest_request' | 'guest_accepted' | 'guest_declined';
     message?: string;
     is_read: boolean;
+    read?: boolean;
     created_at: string;
+    show_slug?: string;
+    show_title?: string;
+    content_type?: number | null;
+    object_id?: number | null;
     recipient: {
         id: number;
         username: string;
-    };
+    } | number;
     actor: {
         id: number;
         username: string;
+        profile_picture?: string | null;
     };
 }
 
@@ -202,13 +208,26 @@ export interface Event {
     id: number;
     title: string;
     description: string;
-    thumbnail: string | null;
-    start_date: string;
-    end_date: string | null;
-    location: string | null;
+    banner_image: string | null;
+    thumbnail: string | null; // alias for banner_image
+    start_date: string;        // frontend alias
+    end_date: string | null;   // frontend alias
+    start_datetime: string;    // backend field
+    end_datetime: string;      // backend field
+    venue_name: string;
+    address: string;
+    location: string | null;   // legacy
     is_virtual: boolean;
     meeting_link: string | null;
-    status: 'draft' | 'published' | 'cancelled';
+    capacity: number | null;
+    registration_link: string;
+    registration_deadline: string | null;
+    is_public: boolean;
+    is_recurring: boolean;
+    recurrence_type: 'SPECIFIC_DAY' | 'DAILY' | 'WEEKDAYS' | 'WEEKENDS' | null;
+    day_of_week: number | null;
+    scheduled_time: string | null;
+    status: 'draft' | 'published' | 'cancelled' | 'upcoming' | 'ongoing' | 'past';
     organizer: {
         id: number;
         username: string;
@@ -216,6 +235,9 @@ export interface Event {
     };
     like_count: number;
     comment_count: number;
+    share_count: number;
+    created_at: string;
+    updated_at: string;
 }
 
 export const fetchEvents = async (status: string = 'published'): Promise<Event[]> => {
@@ -453,7 +475,7 @@ export const fetchCreatorEvents = async (creatorId: number, accessToken?: string
             headers['Authorization'] = `Bearer ${accessToken}`;
         }
 
-        const response = await fetch(`${API_BASE_URL}/events/?creator=${creatorId}`, { headers });
+        const response = await fetch(`${API_BASE_URL}/events/?organizer=${creatorId}`, { headers });
         if (!response.ok) throw new Error(`Failed to fetch creator events: ${response.statusText}`);
         const data = await response.json();
         return data.results || data || [];
@@ -844,9 +866,9 @@ export const addEventComment = async (eventId: number, text: string, accessToken
 // Content Type IDs (from Django ContentType model)
 // These map to the content types in the backend
 export const CONTENT_TYPES = {
-    SHOW: 13,    // ContentType ID for Show model (Railway DB)
-    NEWS: 11,    // ContentType ID for News model (Railway DB)
-    EVENT: 12    // ContentType ID for Event model (Railway DB)
+    SHOW: Number(import.meta.env.VITE_CONTENT_TYPE_SHOW || 13),    // ContentType ID for Show model
+    NEWS: Number(import.meta.env.VITE_CONTENT_TYPE_NEWS || 11),    // ContentType ID for News model
+    EVENT: Number(import.meta.env.VITE_CONTENT_TYPE_EVENT || 12)   // ContentType ID for Event model
 };
 
 // Toggle like/unlike (works for any content type)
@@ -963,6 +985,188 @@ export const deleteComment = async (
     if (!response.ok) throw new Error('Failed to delete comment');
 };
 
+// Update a comment
+export const updateComment = async (
+    commentId: number,
+    text: string,
+    accessToken: string
+): Promise<Comment> => {
+    const response = await fetch(`${API_BASE_URL}/comments/${commentId}/`, {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text })
+    });
+    if (!response.ok) throw new Error('Failed to update comment');
+    return await response.json();
+};
+
+// ============================================
+// EVENT CRUD FUNCTIONS
+// ============================================
+
+export interface CreateEventPayload {
+    title: string;
+    description: string;
+    banner_image?: File;
+    start_datetime?: string;
+    end_datetime?: string;
+    venue_name?: string;
+    address?: string;
+    is_virtual: boolean;
+    meeting_link?: string;
+    capacity?: number;
+    registration_link?: string;
+    registration_deadline?: string;
+    is_public: boolean;
+    is_recurring?: boolean;
+    recurrence_type?: 'SPECIFIC_DAY' | 'DAILY' | 'WEEKDAYS' | 'WEEKENDS';
+    day_of_week?: number;
+    scheduled_time?: string;
+}
+
+export const createEvent = async (
+    payload: CreateEventPayload,
+    accessToken: string
+): Promise<Event> => {
+    const formData = new FormData();
+    formData.append('title', payload.title);
+    formData.append('description', payload.description);
+    formData.append('is_virtual', String(payload.is_virtual));
+    formData.append('is_public', String(payload.is_public));
+
+    // Dates: only send if provided (not required for recurring events)
+    if (payload.start_datetime) formData.append('start_datetime', payload.start_datetime);
+    if (payload.end_datetime) formData.append('end_datetime', payload.end_datetime);
+
+    // Recurring fields
+    if (payload.is_recurring !== undefined) formData.append('is_recurring', String(payload.is_recurring));
+    if (payload.recurrence_type) formData.append('recurrence_type', payload.recurrence_type);
+    if (payload.day_of_week !== undefined) formData.append('day_of_week', String(payload.day_of_week));
+    if (payload.scheduled_time) formData.append('scheduled_time', payload.scheduled_time);
+
+    if (payload.banner_image) formData.append('banner_image', payload.banner_image);
+    if (payload.venue_name) formData.append('venue_name', payload.venue_name);
+    if (payload.address) formData.append('address', payload.address);
+    if (payload.meeting_link) formData.append('meeting_link', payload.meeting_link);
+    if (payload.capacity) formData.append('capacity', String(payload.capacity));
+    if (payload.registration_link) formData.append('registration_link', payload.registration_link);
+    if (payload.registration_deadline) formData.append('registration_deadline', payload.registration_deadline);
+
+    const response = await fetch(`${API_BASE_URL}/events/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+        body: formData,
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || 'Failed to create event');
+    }
+    return await response.json();
+};
+
+export interface UpdateEventPayload {
+    title?: string;
+    description?: string;
+    banner_image?: File;
+    start_datetime?: string;
+    end_datetime?: string;
+    venue_name?: string;
+    address?: string;
+    is_virtual?: boolean;
+    meeting_link?: string;
+    capacity?: number | null;
+    registration_link?: string;
+    registration_deadline?: string | null;
+    is_public?: boolean;
+    is_recurring?: boolean;
+    recurrence_type?: 'SPECIFIC_DAY' | 'DAILY' | 'WEEKDAYS' | 'WEEKENDS';
+    day_of_week?: number;
+    scheduled_time?: string;
+}
+
+export const updateEvent = async (
+    eventId: number,
+    payload: UpdateEventPayload,
+    accessToken: string
+): Promise<Event> => {
+    const formData = new FormData();
+    Object.entries(payload).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+            if (value instanceof File) {
+                formData.append(key, value);
+            } else {
+                formData.append(key, String(value));
+            }
+        }
+    });
+
+    const response = await fetch(`${API_BASE_URL}/events/${eventId}/`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+        body: formData,
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || 'Failed to update event');
+    }
+    return await response.json();
+};
+
+export const deleteEvent = async (
+    eventId: number,
+    accessToken: string
+): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/events/${eventId}/`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+    if (!response.ok) throw new Error('Failed to delete event');
+};
+
+export const trackEventShare = async (eventId: number): Promise<{ success: boolean }> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/events/${eventId}/track_share/`, {
+            method: 'POST',
+        });
+        return await response.json();
+    } catch (error) {
+        console.error('Error tracking event share:', error);
+        return { success: false };
+    }
+};
+
+// ============================================
+// FEEDBACK FUNCTION
+// ============================================
+
+export const submitFeedback = async (
+    category: 'bug' | 'feature' | 'general',
+    message: string,
+    userIdentifier?: string
+): Promise<{ success: boolean; message: string }> => {
+    const response = await fetch(`${API_BASE_URL}/feedback/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            category,
+            message,
+            user_identifier: userIdentifier || 'anonymous'
+        })
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to submit feedback' }));
+        throw new Error(error.error || 'Failed to submit feedback');
+    }
+
+    return await response.json();
+};
+
 // ============================================
 // FOLLOW FUNCTIONS
 // ============================================
@@ -1037,7 +1241,7 @@ export const checkIsFollowing = async (
 // NOTIFICATION FUNCTIONS
 // ============================================
 
-export interface Notification {
+export interface NotificationResponse {
     id: number;
     recipient: number;
     actor: {
@@ -1045,7 +1249,7 @@ export interface Notification {
         username: string;
         profile_picture: string | null;
     };
-    notification_type: 'follow' | 'like' | 'comment' | 'show_reminder' | 'show_cancelled' | 'guest_request' | 'guest_accepted' | 'guest_declined';
+    notification_type: 'follow' | 'like' | 'comment' | 'share' | 'show_reminder' | 'show_cancelled' | 'guest_request' | 'guest_accepted' | 'guest_declined';
     content_type: number | null;
     object_id: number | null;
     message?: string;
@@ -1304,3 +1508,4 @@ export const declineGuestRequest = async (requestId: number, accessToken: string
 
     return await response.json();
 };
+

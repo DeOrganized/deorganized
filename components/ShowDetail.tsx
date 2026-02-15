@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Heart, MessageCircle, Share2, Play, Calendar, Clock, User, Users, Bell, UserPlus, UserCheck, ExternalLink, Hash } from 'lucide-react';
+import { ArrowLeft, Heart, MessageCircle, Share2, Play, Calendar, Clock, User, Users, Bell, UserPlus, UserCheck, ExternalLink, Hash, MoreHorizontal, Pencil, Trash2, Check, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../lib/AuthContext';
 import { requireAuth } from '../lib/walletHelpers';
@@ -12,6 +12,7 @@ import {
     checkIfLiked,
     createComment,
     deleteComment,
+    updateComment,
     toggleFollow,
     checkIsFollowing,
     trackShare,
@@ -44,6 +45,9 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
     const [showErrorToast, setShowErrorToast] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [commentToDelete, setCommentToDelete] = useState<number | null>(null);
+    const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+    const [editCommentText, setEditCommentText] = useState('');
+    const [commentMenuId, setCommentMenuId] = useState<number | null>(null);
     const [showGuestRequestModal, setShowGuestRequestModal] = useState(false);
     const [guestRequestMessage, setGuestRequestMessage] = useState('');
     const [submittingGuestRequest, setSubmittingGuestRequest] = useState(false);
@@ -185,6 +189,24 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
         } catch (error) {
             console.error('Failed to delete comment:', error);
             alert('Failed to delete comment');
+        }
+    };
+
+    const handleEditComment = async (commentId: number) => {
+        if (!editCommentText.trim() || !accessToken) return;
+        try {
+            await updateComment(commentId, editCommentText, accessToken);
+
+            // Re-fetch comments to get full updated data
+            if (show) {
+                const updatedComments = await fetchComments(CONTENT_TYPES.SHOW, show.id, true, accessToken);
+                setComments(updatedComments);
+            }
+            setEditingCommentId(null);
+            setEditCommentText('');
+        } catch (error) {
+            console.error('Failed to edit comment:', error);
+            alert('Failed to edit comment');
         }
     };
 
@@ -599,26 +621,28 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
             </div>
 
             {/* Interactions Bar */}
-            <div className="container max-w-[1280px] mx-auto px-6 mb-12">
-                <div className="bg-canvas rounded-2xl border border-borderSubtle shadow-soft p-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex gap-6">
+            <div className="container max-w-[1280px] mx-auto px-4 sm:px-6 mb-8 sm:mb-12">
+                <div className="bg-canvas rounded-2xl border border-borderSubtle shadow-soft p-4 sm:p-6">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex gap-2 sm:gap-6">
                             {/* Like Button */}
                             <button
                                 onClick={handleLikeToggle}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-full font-semibold transition-all ${isLiked
+                                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-full font-semibold transition-all text-sm sm:text-base ${isLiked
                                     ? 'bg-red-50 text-red-500 border border-red-200'
                                     : 'bg-surface text-inkLight hover:bg-red-50 hover:text-red-500'
                                     }`}
                             >
-                                <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
-                                {likeCount} {likeCount === 1 ? 'Like' : 'Likes'}
+                                <Heart className={`w-4 h-4 sm:w-5 sm:h-5 ${isLiked ? 'fill-current' : ''}`} />
+                                <span className="hidden sm:inline">{likeCount} {likeCount === 1 ? 'Like' : 'Likes'}</span>
+                                <span className="sm:hidden">{likeCount}</span>
                             </button>
 
                             {/* Comment Count */}
-                            <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface text-inkLight font-semibold hover:bg-gold-50 hover:text-gold transition-all">
-                                <MessageCircle className="w-5 h-5" />
-                                {comments.length} {comments.length === 1 ? 'Comment' : 'Comments'}
+                            <button className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-full bg-surface text-inkLight font-semibold hover:bg-gold-50 hover:text-gold transition-all text-sm sm:text-base">
+                                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                                <span className="hidden sm:inline">{comments.length} {comments.length === 1 ? 'Comment' : 'Comments'}</span>
+                                <span className="sm:hidden">{comments.length}</span>
                             </button>
                         </div>
 
@@ -626,10 +650,10 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
                         <div className="relative">
                             <button
                                 onClick={handleShare}
-                                className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface text-inkLight font-semibold hover:bg-blue-50 hover:text-blue-500 transition-all"
+                                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-full bg-surface text-inkLight font-semibold hover:bg-blue-50 hover:text-blue-500 transition-all text-sm sm:text-base"
                             >
-                                <Share2 className="w-5 h-5" />
-                                Share
+                                <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                                <span className="hidden sm:inline">Share</span>
                             </button>
 
                             {showSharePopup && (
@@ -701,35 +725,86 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
                             </div>
                         ) : (
                             comments.map((comment) => (
-                                <div key={comment.id} className="flex gap-4 pb-6 border-b border-borderSubtle last:border-0">
-                                    <img
-                                        src={comment.user.profile_picture || "https://picsum.photos/100/100"}
-                                        alt={comment.user.username}
-                                        className="w-10 h-10 rounded-full border-2 border-borderSubtle"
-                                    />
+                                <div key={comment.id} className="flex gap-3 group pb-6 border-b border-borderSubtle last:border-0">
+                                    <div
+                                        className="w-8 h-8 rounded-full overflow-hidden bg-surface flex-shrink-0 cursor-pointer"
+                                        onClick={() => onNavigate?.('creator-detail', comment.user.id)}
+                                    >
+                                        {comment.user.profile_picture ? (
+                                            <img src={comment.user.profile_picture} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-xs font-bold text-gold">
+                                                {comment.user.username.charAt(0).toUpperCase()}
+                                            </div>
+                                        )}
+                                    </div>
                                     <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-bold text-ink">
-                                                {comment.user.username}
-                                            </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold text-ink">{comment.user.username}</span>
                                             <span className="text-xs text-inkLight">
                                                 {new Date(comment.created_at).toLocaleDateString()}
                                             </span>
-                                        </div>
-                                        <p className="text-ink font-medium mb-2">
-                                            {comment.text}
-                                        </p>
 
-                                        {/* Delete button (only for own comments) */}
-                                        {isAuthenticated && comment.user.id === userData.id && (
-                                            <button
-                                                onClick={() => handleDeleteComment(comment.id)}
-                                                className="text-xs text-red-500 hover:text-red-700 font-semibold"
-                                            >
-                                                Delete
-                                            </button>
+                                        </div>
+
+                                        {editingCommentId === comment.id ? (
+                                            <div className="mt-1 flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={editCommentText}
+                                                    onChange={(e) => setEditCommentText(e.target.value)}
+                                                    className="flex-1 bg-canvas border border-gold rounded-lg px-3 py-1.5 text-sm text-ink focus:outline-none"
+                                                    autoFocus
+                                                />
+                                                <button
+                                                    onClick={() => handleEditComment(comment.id)}
+                                                    className="text-green-500 hover:text-green-600 p-1"
+                                                >
+                                                    <Check className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => { setEditingCommentId(null); setEditCommentText(''); }}
+                                                    className="text-red-400 hover:text-red-500 p-1"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-inkLight mt-0.5">{comment.text}</p>
                                         )}
                                     </div>
+
+                                    {/* Comment Actions */}
+                                    {isAuthenticated && comment.user.id === userData.id && editingCommentId !== comment.id && (
+                                        <div className="relative">
+                                            <button
+                                                onClick={() => setCommentMenuId(commentMenuId === comment.id ? null : comment.id)}
+                                                className="opacity-0 group-hover:opacity-100 p-1 text-inkLight hover:text-ink transition-all"
+                                            >
+                                                <MoreHorizontal className="w-4 h-4" />
+                                            </button>
+                                            {commentMenuId === comment.id && (
+                                                <div className="absolute right-0 top-full mt-1 bg-surface border border-borderSubtle rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingCommentId(comment.id);
+                                                            setEditCommentText(comment.text);
+                                                            setCommentMenuId(null);
+                                                        }}
+                                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-ink hover:bg-canvas transition-colors"
+                                                    >
+                                                        <Pencil className="w-3 h-3" /> Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteComment(comment.id)}
+                                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 transition-colors"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" /> Delete
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             ))
                         )}
