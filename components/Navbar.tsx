@@ -43,7 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
 
   // Auto-authenticate when wallet connects (only once per wallet address)
   useEffect(() => {
-    console.log('🔄 [NAVBAR useEffect] Running check:', { isWalletConnected, walletAddress, isBackendAuthenticated, isAuthenticating, currentPage });
+
 
     // Only proceed if:
     // 1. Wallet is connected
@@ -60,7 +60,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
       walletCheckAttempted.current !== walletAddress &&
       currentPage !== 'register'  // KEY FIX: Don't re-check if already on register page
     ) {
-      console.log('✅ [NAVBAR] All conditions met - triggering handleWalletConnect');
+
       // Mark this wallet as checked
       walletCheckAttempted.current = walletAddress;
 
@@ -71,16 +71,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
         },
         // On existing user - reload page to show authenticated state
         () => {
-          console.log('✅ [NAVBAR] Existing user callback triggered - reloading page NOW...');
+
           // Reload to update all components with authenticated state
           window.location.reload();
         }
       );
-    } else {
-      console.log('❌ [NAVBAR] Skipping - condition failed:', {
-        alreadyChecked: walletCheckAttempted.current === walletAddress,
-        walletCheckAttempted: walletCheckAttempted.current
-      });
     }
   }, [isWalletConnected, walletAddress, isBackendAuthenticated, isAuthenticating, currentPage, onNavigate, handleWalletConnect, backendUser]);
 
