@@ -9,6 +9,7 @@ import { useAuth } from '../lib/AuthContext';
 import {
     dcpeHealth, dcpeStatus, dcpePlaylists, dcpeSetPlaylist,
     dcpeAdvance, dcpeStreamStart, dcpeStreamStop, dcpeCreateFolder, dcpeUpload,
+    dcpeSetPlaylistOrder,
     DCPEStatus, DCPEPlaylist,
     fetchRTMPDestinations, createRTMPDestination, updateRTMPDestination, deleteRTMPDestination,
     RTMPDestination, PLATFORM_LABELS, DEFAULT_RTMP_URLS,
@@ -254,6 +255,14 @@ export const PlayoutControl: React.FC<PlayoutControlProps> = ({ onNavigate, admi
     const handleStreamStart = async () => {
         if (!accessToken || !isStaff) return;
         try {
+            // Sync playlist order before starting stream
+            if (queue.length > 0) {
+                log('🔄 Syncing playlist order...', 'info');
+                const folders = queue.map(item => item.folder);
+                await dcpeSetPlaylistOrder(folders, accessToken);
+                log('✅ Playlist order synced', 'success');
+            }
+
             log('🚀 Signal sent: Starting RTMP stream...', 'info');
             await dcpeStreamStart(accessToken);
             setTimeout(fetchStatus, 2000);
@@ -845,9 +854,9 @@ export const PlayoutControl: React.FC<PlayoutControlProps> = ({ onNavigate, admi
                                     <button
                                         type="button"
                                         onClick={handleStreamStart}
-                                        disabled={!isStaff}
-                                        title={!isStaff ? 'Admin only' : 'Enable RTMP pushing'}
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold transition-all ${isStaff 
+                                        disabled={queue.length === 0 || !isStaff}
+                                        title={!isStaff ? 'Admin only' : queue.length === 0 ? 'Add folders to queue before streaming' : 'Enable RTMP pushing'}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold transition-all ${isStaff && queue.length > 0
                                             ? 'bg-ink text-background hover:bg-ink/90' 
                                             : 'bg-ink/20 text-ink/40 cursor-not-allowed'}`}
                                     >

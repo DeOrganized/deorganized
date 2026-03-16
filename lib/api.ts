@@ -2202,7 +2202,7 @@ export const dcpeStreamStop = async (token: string): Promise<any> => {
     return resp.json();
 };
 
-export const dcpeCreateFolder = async (name: string, token: string): Promise<any> => {
+export const dcpeCreateFolder = async (name: string, token: string, label?: string): Promise<any> => {
     const opsBaseUrl = API_BASE_URL.replace('/api', '') + '/ops';
     const resp = await fetch(`${opsBaseUrl}/create-folder/`, {
         method: 'POST',
@@ -2210,15 +2210,16 @@ export const dcpeCreateFolder = async (name: string, token: string): Promise<any
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ folder: name, label: label || name })
     });
     if (!resp.ok) throw new Error('Failed to create folder');
     return resp.json();
 };
 
-export const dcpeUpload = async (files: File[], token: string): Promise<any> => {
+export const dcpeUpload = async (files: File[], token: string, folder?: string): Promise<any> => {
     const formData = new FormData();
     files.forEach(file => formData.append('files', file));
+    if (folder) formData.append('folder', folder);
     
     const opsBaseUrl = API_BASE_URL.replace('/api', '') + '/ops';
     const resp = await fetch(`${opsBaseUrl}/upload/`, {
@@ -2227,6 +2228,20 @@ export const dcpeUpload = async (files: File[], token: string): Promise<any> => 
         body: formData
     });
     if (!resp.ok) throw new Error('Failed to upload files');
+    return resp.json();
+};
+
+export const dcpeSetPlaylistOrder = async (folders: string[], token: string): Promise<any> => {
+    const opsBaseUrl = API_BASE_URL.replace('/api', '') + '/ops';
+    const resp = await fetch(`${opsBaseUrl}/set-playlist-order/`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ folders })
+    });
+    if (!resp.ok) throw new Error('Failed to set playlist order');
     return resp.json();
 };
 // --- RTMP Destinations API ---
