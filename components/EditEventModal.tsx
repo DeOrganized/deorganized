@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Loader2, Upload } from 'lucide-react';
-import { Event, updateEvent, UpdateEventPayload } from '../lib/api';
+import { X, Save, Loader2, Upload, Trash2 } from 'lucide-react';
+import { Event, updateEvent, deleteEvent, UpdateEventPayload } from '../lib/api';
 import { useAuth } from '../lib/AuthContext';
 
 interface EditEventModalProps {
@@ -8,6 +8,7 @@ interface EditEventModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    isOwner?: boolean;
 }
 
 const DAYS_OF_WEEK = [
@@ -20,8 +21,8 @@ const DAYS_OF_WEEK = [
     { value: 6, label: 'Sunday' },
 ];
 
-export const EditEventModal: React.FC<EditEventModalProps> = ({ event, isOpen, onClose, onSuccess }) => {
-    const { accessToken } = useAuth();
+export const EditEventModal: React.FC<EditEventModalProps> = ({ event, isOpen, onClose, onSuccess, isOwner = true }) => {
+    const { backendUser, accessToken } = useAuth();
     const [formData, setFormData] = useState({
         title: event.title,
         description: event.description,
@@ -74,6 +75,24 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({ event, isOpen, o
                 setBannerPreview(reader.result as string);
             };
             reader.readAsDataURL(file);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!accessToken) return;
+        if (!window.confirm(`Are you sure you want to delete "${event.title}"? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            setIsSubmitting(true);
+            setError(null);
+            await deleteEvent(event.id, accessToken);
+            onSuccess();
+            onClose();
+        } catch (err: any) {
+            setError(err.message || 'Failed to delete event');
+            setIsSubmitting(false);
         }
     };
 
@@ -169,6 +188,30 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({ event, isOpen, o
                         <X className="w-6 h-6" />
                     </button>
                 </div>
+
+                {/* Co-host Restriction Overlay */}
+                {!isOwner && (
+                    <div className="absolute inset-x-0 bottom-0 top-[89px] bg-canvas/80 backdrop-blur-sm z-50 flex items-center justify-center p-8 rounded-b-3xl">
+                        <div className="bg-surface border border-gold/30 p-10 rounded-3xl shadow-2xl max-w-md text-center space-y-6">
+                            <div className="w-20 h-20 bg-gold/10 rounded-full flex items-center justify-center mx-auto">
+                                <Crown className="w-10 h-10 text-gold" />
+                            </div>
+                            <div className="space-y-2">
+                                <h3 className="text-xl font-black text-ink">Co-host View Only</h3>
+                                <p className="text-inkLight font-medium">
+                                    Seems you're a co-host, you can't edit this. <br />
+                                    <span className="text-gold">Contact the host of the event</span> to make changes.
+                                </p>
+                            </div>
+                            <button 
+                                onClick={onClose}
+                                className="w-full py-3 bg-canvas text-ink font-bold rounded-xl border border-borderSubtle hover:border-gold transition-all"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="p-8 space-y-6">
@@ -410,32 +453,43 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({ event, isOpen, o
                     </div>
 
                     {/* Actions */}
-                    <div className="flex gap-4 pt-4">
+                    <div className="flex flex-col sm:flex-row gap-4 pt-4">
                         <button
                             type="button"
-                            onClick={onClose}
+                            onClick={handleDelete}
                             disabled={isSubmitting}
-                            className="flex-1 bg-surface text-ink font-bold py-3 rounded-xl border border-borderSubtle hover:bg-surface-hover transition-all disabled:opacity-50"
+                            className="flex-1 bg-red-50 text-red-600 font-bold py-3 rounded-xl border border-red-100 hover:bg-red-100 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                         >
-                            Cancel
+                            <Trash2 className="w-5 h-5" />
+                            Delete Event
                         </button>
-                        <button
-                            type="submit"
-                            disabled={isSubmitting}
-                            className="flex-1 bg-gold-gradient text-white font-bold py-3 rounded-xl shadow-lg shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
-                        >
-                            {isSubmitting ? (
-                                <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    Saving...
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="w-5 h-5" />
-                                    Save Changes
-                                </>
-                            )}
-                        </button>
+                        <div className="flex-1 flex gap-4">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                disabled={isSubmitting}
+                                className="flex-1 bg-surface text-ink font-bold py-3 rounded-xl border border-borderSubtle hover:bg-surface-hover transition-all disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="flex-1 bg-gold-gradient text-white font-bold py-3 rounded-xl shadow-lg shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="w-5 h-5" />
+                                        Save Changes
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>

@@ -46,8 +46,8 @@ export const CreatorsDiscovery: React.FC<CreatorsDiscoveryProps> = ({ onNavigate
     loadCreators();
   }, []);
 
-  const handleCreatorClick = (id: number) => {
-    if (onNavigate) onNavigate('creator-detail', id);
+  const handleCreatorClick = (creator: Creator) => {
+    if (onNavigate) onNavigate('creator-detail', creator.username);
   };
 
   if (loading) {
@@ -136,7 +136,7 @@ export const CreatorsDiscovery: React.FC<CreatorsDiscoveryProps> = ({ onNavigate
         {creators.map((creator) => (
           <motion.div
             key={creator.id}
-            onClick={() => handleCreatorClick(creator.id)}
+            onClick={() => handleCreatorClick(creator)}
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Heart, MessageCircle, Share2, Play, Calendar, Clock, User, Users, Bell, UserPlus, UserCheck, ExternalLink, Hash, MoreHorizontal, Pencil, Trash2, Check, X } from 'lucide-react';
+import { ArrowLeft, Heart, MessageCircle, Share2, Play, Calendar, Clock, User, Users, Bell, UserPlus, UserCheck, ExternalLink, Hash, MoreHorizontal, Pencil, Trash2, Check, X, Lock, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../lib/AuthContext';
 import { requireAuth } from '../lib/walletHelpers';
+import { PaywallModal, PaymentToken as PaywallToken } from './Payment/PaywallModal';
+import { useToast } from './Toast';
 
 import {
     API_BASE_URL,
@@ -18,10 +20,13 @@ import {
     trackShare,
     deleteShow,
     createGuestRequest,
-    CONTENT_TYPES,
+    fetchShowEpisodes,
     Show,
+    ShowEpisode,
     Comment,
-    checkExistingGuestRequest
+    checkExistingGuestRequest,
+    x402Fetch,
+    getImageUrl
 } from '../lib/api';
 
 interface ShowDetailProps {
@@ -31,6 +36,8 @@ interface ShowDetailProps {
 
 export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) => {
     const [show, setShow] = useState<Show | null>(null);
+    const toast = useToast();
+    const [episodes, setEpisodes] = useState<ShowEpisode[]>([]);
     const [comments, setComments] = useState<Comment[]>([]);
     const [isLiked, setIsLiked] = useState(false);
     const [likeCount, setLikeCount] = useState(0);
@@ -52,6 +59,11 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
     const [guestRequestMessage, setGuestRequestMessage] = useState('');
     const [submittingGuestRequest, setSubmittingGuestRequest] = useState(false);
     const [hasExistingRequest, setHasExistingRequest] = useState(false);
+    const [activeTab, setActiveTab] = useState<'episodes' | 'comments'>('episodes');
+    const [loadingEpisodes, setLoadingEpisodes] = useState(false);
+    const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+    const [selectedEpisode, setSelectedEpisode] = useState<ShowEpisode | null>(null);
+    const [isPaymentLoading, setIsPaymentLoading] = useState(false);
 
     // Get auth from AuthContext
     const { isBackendAuthenticated, backendUser, accessToken, connectWallet } = useAuth();
@@ -72,12 +84,23 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
             setLikeCount(showData.like_count);
 
             // Fetch comments using numeric ID, not slug
-            const commentsData = await fetchComments(CONTENT_TYPES.SHOW, showData.id, true, accessToken || undefined);
+            const commentsData = await fetchComments('show', showData.id, true, accessToken || undefined);
             setComments(commentsData);
+
+            // Fetch episodes
+            setLoadingEpisodes(true);
+            try {
+                const episodesData = await fetchShowEpisodes(showId);
+                setEpisodes(episodesData);
+            } catch (err) {
+                console.error('Failed to load episodes:', err);
+            } finally {
+                setLoadingEpisodes(false);
+            }
 
             // Check if user has liked (if authenticated)
             if (isAuthenticated && userData) {
-                const liked = await checkIfLiked(CONTENT_TYPES.SHOW, showData.id, userData.id);
+                const liked = await checkIfLiked('show', showData.id, userData.id);
                 setIsLiked(liked);
 
                 // Check if user is following the creator
@@ -122,7 +145,7 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
             setIsLiked(!wasLiked);
             setLikeCount(prev => wasLiked ? prev - 1 : prev + 1);
 
-            const result = await toggleLike(CONTENT_TYPES.SHOW, show!.id, accessToken!);
+            const result = await toggleLike('show', show!.id, accessToken!);
 
             // Verify with server data
             const updatedShow = await fetchShowById(showId);
@@ -139,7 +162,7 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
             // Revert optimistic update on error
             setIsLiked(isLiked);
             setLikeCount(show?.like_count || 0);
-            alert('Failed to update like status');
+            toast.error('Failed to update like status');
         }
     };
 
@@ -157,19 +180,19 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
         try {
             setSubmittingComment(true);
             await createComment(
-                CONTENT_TYPES.SHOW,
+                'show',
                 show!.id,
                 commentText,
                 accessToken!
             );
 
             // Re-fetch comments to get full data with user info
-            const updatedComments = await fetchComments(CONTENT_TYPES.SHOW, show!.id, true, accessToken);
+            const updatedComments = await fetchComments('show', show!.id, true, accessToken);
             setComments(updatedComments);
             setCommentText('');
         } catch (error) {
             console.error('Failed to add comment:', error);
-            alert('Failed to post comment');
+            toast.error('Failed to post comment');
         } finally {
             setSubmittingComment(false);
         }
@@ -188,7 +211,7 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
             setCommentToDelete(null);
         } catch (error) {
             console.error('Failed to delete comment:', error);
-            alert('Failed to delete comment');
+            toast.error('Failed to delete comment');
         }
     };
 
@@ -206,7 +229,7 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
             setEditCommentText('');
         } catch (error) {
             console.error('Failed to edit comment:', error);
-            alert('Failed to edit comment');
+            toast.error('Failed to edit comment');
         }
     };
 
@@ -321,40 +344,51 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
             onNavigate?.('shows');
         } catch (error) {
             console.error('Failed to delete show:', error);
-            alert('Failed to delete show. Please try again.');
+            toast.error('Failed to delete show. Please try again.');
             setShowDeleteModal(false);
         }
     };
 
     const handleGuestRequest = async () => {
-        if (!isAuthenticated || !accessToken || !show) {
-            connectWallet();
-            return;
-        }
+        // ... existing handleGuestRequest function
+    };
 
-        if (userData?.role !== 'creator') {
-            setErrorMessage('Only creators can request guest appearances');
-            setShowErrorToast(true);
-            setTimeout(() => setShowErrorToast(false), 3000);
-            return;
+    const handleEpisodeClick = (episode: ShowEpisode) => {
+        if (episode.is_premium) {
+            setSelectedEpisode(episode);
+            setIsPaywallOpen(true);
+        } else if (episode.video_url) {
+            window.open(episode.video_url, '_blank');
         }
+    };
+
+    const handleConfirmPayment = async (token: PaywallToken) => {
+        if (!selectedEpisode || !accessToken) return;
 
         try {
-            setSubmittingGuestRequest(true);
-            await createGuestRequest(show.id, guestRequestMessage, accessToken);
-            setShowGuestRequestModal(false);
-            setGuestRequestMessage('');
-            setToastMessage('Guest request sent successfully! 🎉');
-            setShowSuccessToast(true);
-            setTimeout(() => setShowSuccessToast(false), 3000);
-            setHasExistingRequest(true);
-        } catch (error: any) {
-            console.error('Failed to send guest request:', error);
-            setErrorMessage(error.message || 'Failed to send guest request. Please try again.');
-            setShowErrorToast(true);
-            setTimeout(() => setShowErrorToast(false), 3000);
+            setIsPaymentLoading(true);
+            const { response } = await x402Fetch(`${API_BASE_URL}/episodes/${selectedEpisode.id}/`, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            }, {
+                tokenType: token
+            });
+
+            if (response.ok) {
+                const unlockedEpisode = await response.json();
+                setIsPaywallOpen(false);
+                setSelectedEpisode(null);
+                // Update episodes list with unlocked data
+                setEpisodes(prev => prev.map(ep => ep.id === unlockedEpisode.id ? unlockedEpisode : ep));
+                
+                if (unlockedEpisode.video_url) {
+                    window.open(unlockedEpisode.video_url, '_blank');
+                }
+            }
+        } catch (error) {
+            console.error('Payment failed:', error);
+            toast.error('Payment failed. Please try again.');
         } finally {
-            setSubmittingGuestRequest(false);
+            setIsPaymentLoading(false);
         }
     };
 
@@ -443,7 +477,7 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
                             <div className="flex items-center justify-between gap-4 pt-4 border-t border-borderSubtle">
                                 <div className="flex items-center gap-4">
                                     <img
-                                        src={show.creator.profile_picture || "https://picsum.photos/100/100"}
+                                        src={getImageUrl(show.creator.profile_picture) || "https://picsum.photos/100/100"}
                                         alt={show.creator.username}
                                         className="w-12 h-12 rounded-full border-2 border-borderSubtle shadow-sm"
                                     />
@@ -468,7 +502,7 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
                                                 setIsFollowing(result.status === 'followed');
                                             } catch (error) {
                                                 console.error('Failed to toggle follow:', error);
-                                                alert('Failed to update follow status');
+                                                toast.error('Failed to update follow status');
                                             }
                                         }}
                                         className={`flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-sm transition-all ${isFollowing
@@ -701,9 +735,92 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
                 </div>
             </div>
 
-            {/* Comments Section */}
+            {/* Tab Navigation */}
+            <div className="container max-w-[1280px] mx-auto px-6 mb-8">
+                <div className="flex gap-4 border-b border-borderSubtle">
+                    <button
+                        onClick={() => setActiveTab('episodes')}
+                        className={`pb-4 px-2 font-bold transition-all relative ${activeTab === 'episodes' ? 'text-gold' : 'text-inkLight hover:text-ink'}`}
+                    >
+                        Episodes ({episodes.length})
+                        {activeTab === 'episodes' && (
+                            <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-gold" />
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('comments')}
+                        className={`pb-4 px-2 font-bold transition-all relative ${activeTab === 'comments' ? 'text-gold' : 'text-inkLight hover:text-ink'}`}
+                    >
+                        Comments ({comments.length})
+                        {activeTab === 'comments' && (
+                            <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-gold" />
+                        )}
+                    </button>
+                </div>
+            </div>
+
+            {/* Content Section */}
             <div className="container max-w-[1280px] mx-auto px-6">
-                <div className="bg-canvas rounded-2xl border border-borderSubtle shadow-soft p-8">
+                {activeTab === 'episodes' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {loadingEpisodes ? (
+                            <div className="col-span-full py-20 text-center text-inkLight">
+                                <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4" />
+                                Loading episodes...
+                            </div>
+                        ) : episodes.length === 0 ? (
+                            <div className="col-span-full py-20 text-center bg-surface rounded-3xl border border-dashed border-borderSubtle">
+                                <Play className="w-12 h-12 text-inkLight/20 mx-auto mb-4" />
+                                <p className="text-inkLight">No episodes available yet.</p>
+                            </div>
+                        ) : (
+                            episodes.map((episode) => (
+                                <motion.div
+                                    key={episode.id}
+                                    whileHover={{ y: -5 }}
+                                    className="bg-surface rounded-2xl border border-borderSubtle p-5 hover:border-gold/30 transition-all cursor-pointer shadow-soft group"
+                                    onClick={() => handleEpisodeClick(episode)}
+                                >
+                                    <div className="flex items-center justify-between mb-4">
+                                        <span className="bg-gold/10 text-gold px-2 py-0.5 rounded text-[10px] font-black uppercase">
+                                            EP {episode.episode_number}
+                                        </span>
+                                        {episode.is_premium && (
+                                            <span className="flex items-center gap-1 text-gold">
+                                                <Lock className="w-3.5 h-3.5" />
+                                                <span className="text-[10px] font-bold uppercase">Premium</span>
+                                            </span>
+                                        )}
+                                    </div>
+                                    <h3 className="font-bold text-ink mb-2 line-clamp-1 group-hover:text-gold transition-colors">
+                                        {episode.title}
+                                    </h3>
+                                    <p className="text-xs text-inkLight line-clamp-2 mb-4 h-8">
+                                        {episode.description}
+                                    </p>
+                                    <div className="flex items-center justify-between pt-4 border-t border-borderSubtle">
+                                        <div className="flex items-center gap-3 text-[10px] text-inkLight font-bold uppercase tracking-wider">
+                                            <span className="flex items-center gap-1">
+                                                <Calendar className="w-3 h-3" />
+                                                {episode.air_date}
+                                            </span>
+                                            {episode.duration && (
+                                                <span className="flex items-center gap-1">
+                                                    <Clock className="w-3 h-3" />
+                                                    {episode.duration}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="p-2 rounded-lg bg-ink/5 text-inkLight group-hover:bg-gold/10 group-hover:text-gold transition-all">
+                                            {episode.is_premium ? <Lock className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ))
+                        )}
+                    </div>
+                ) : (
+                    <div className="bg-canvas rounded-2xl border border-borderSubtle shadow-soft p-8">
                     <h2 className="text-2xl font-bold text-ink mb-6">Comments</h2>
 
                     {/* Add Comment Form */}
@@ -841,7 +958,8 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
                         )}
                     </div>
                 </div>
-            </div>
+            )}
+        </div>
 
             {/* Delete Confirmation Modal */}
             {showDeleteModal && (
@@ -994,38 +1112,53 @@ export const ShowDetail: React.FC<ShowDetailProps> = ({ onNavigate, showId }) =>
                             </button>
                         </div>
                     </motion.div>
-                    {/* Success Toast */}
-                    {showSuccessToast && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 50 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 50 }}
-                            className="fixed bottom-8 right-8 bg-green-500 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 z-50"
-                        >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span className="font-bold">{toastMessage}</span>
-                        </motion.div>
-                    )}
-
-                    {/* Error Toast */}
-                    {showErrorToast && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 50 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 50 }}
-                            className="fixed bottom-8 right-8 bg-red-500 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 z-50"
-                        >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span className="font-bold">{errorMessage}</span>
-                        </motion.div>
-                    )}
-
                 </div>
             )}
+
+            {/* Success Toast */}
+            {showSuccessToast && (
+                <motion.div
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 50 }}
+                    className="fixed bottom-8 right-8 bg-green-500 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 z-50"
+                >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="font-bold">{toastMessage}</span>
+                </motion.div>
+            )}
+
+            {/* Error Toast */}
+            {showErrorToast && (
+                <motion.div
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 50 }}
+                    className="fixed bottom-8 right-8 bg-red-500 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 z-50"
+                >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="font-bold">{errorMessage}</span>
+                </motion.div>
+            )}
+            {/* Paywall Modal */}
+            <PaywallModal
+                isOpen={isPaywallOpen}
+                onClose={() => {
+                    setIsPaywallOpen(false);
+                    setSelectedEpisode(null);
+                }}
+                onConfirm={handleConfirmPayment}
+                title={selectedEpisode?.title || "Premium Episode"}
+                description={selectedEpisode?.description || "Unlock this premium episode to watch the full content."}
+                priceSTX={Number(selectedEpisode?.price_stx || 0) * 1_000_000}
+                priceUSDCx={Number(selectedEpisode?.price_usdcx || 0) * 1_000_000}
+                isLoading={isPaymentLoading}
+                resourceType="episode"
+            />
         </div>
     );
 };

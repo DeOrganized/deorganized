@@ -144,6 +144,7 @@ export const EventCalendar: React.FC<EventCalendarProps> = ({ onNavigate }) => {
                             endDate: endDate ? new Date(endDate) : undefined,
                             thumbnail: event.banner_image || event.thumbnail,
                             creator: event.organizer.username, creatorId: event.organizer.id,
+                            slug: event.slug,
                             isVirtual: event.is_virtual,
                             location: event.venue_name || event.location || undefined,
                             status: event.status,
@@ -158,6 +159,7 @@ export const EventCalendar: React.FC<EventCalendarProps> = ({ onNavigate }) => {
                                     id: event.id, title: event.title, type: 'event', date: d,
                                     thumbnail: event.banner_image || event.thumbnail,
                                     creator: event.organizer.username, creatorId: event.organizer.id,
+                                    slug: event.slug,
                                     isVirtual: event.is_virtual,
                                     location: event.venue_name || event.location || undefined,
                                     status: event.status,
@@ -224,7 +226,7 @@ export const EventCalendar: React.FC<EventCalendarProps> = ({ onNavigate }) => {
         if (item.type === 'show') {
             onNavigate('show-detail', item.slug || item.id);
         } else {
-            onNavigate('event-detail', item.id);
+            onNavigate('event-detail', item.slug || item.id);
         }
     };
 

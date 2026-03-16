@@ -1,5 +1,14 @@
 // API Configuration - Environment-aware
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
+import { x402Fetch as x402RawFetch, X402PaymentOptions } from './x402Client';
+
+export const x402Fetch = x402RawFetch;
+
+export const getImageUrl = (url: string | null) => {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    return `${API_BASE_URL.replace('/api', '')}${url}`;
+};
 
 // TypeScript Interfaces
 export interface Tag {
@@ -44,6 +53,7 @@ export interface Show {
     like_count: number;
     comment_count: number;
     share_count: number;
+    episode_count?: number;
 }
 
 export interface Notification {
@@ -87,6 +97,47 @@ export interface ShowInstance {
     datetime: string;
     status: string;
     reminder_status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | null;
+}
+
+export interface Merch {
+    id: number;
+    creator: number;
+    creator_username: string;
+    name: string;
+    slug: string;
+    description: string;
+    price_stx: string;
+    price_usdcx: string;
+    stock: number;
+    image: string | null;
+    is_active: boolean;
+    created_at: string;
+}
+
+export interface Order {
+    id: number;
+    user: number;
+    username: string;
+    merch: number;
+    merch_name: string;
+    quantity: number;
+    tx_id: string;
+    payment_currency: 'STX' | 'USDCx';
+    amount_paid: string;
+    status: 'pending' | 'paid' | 'shipped' | 'completed' | 'failed';
+    shipping_address: string;
+    created_at: string;
+}
+
+export interface CreatorStats {
+    total_views: number;
+    total_shares: number;
+    total_likes: number;
+    total_comments: number;
+    follower_count: number;
+    following_count: number;
+    show_count: number;
+    event_count: number;
 }
 
 export interface GuestRequest {
@@ -134,6 +185,84 @@ export interface User {
     following_count?: number;
     date_joined?: string;
 }
+
+// --- Playout & Subscription Interfaces ---
+
+export interface DCPEStatus {
+    status: string;
+    mode: string;
+    playlist_loaded: boolean;
+    now_playing: string | null;
+    rtmp_connected: boolean;
+    streaming_enabled: boolean;
+    last_prep_at: string | null;
+    last_error: string | null;
+}
+
+export interface DCPEPlaylist {
+    id: string;
+    name: string;
+    folder: string;
+    track_count: number;
+}
+
+export interface RTMPDestination {
+    id: number;
+    platform: string;
+    label: string;
+    rtmp_url: string;
+    stream_key: string;
+    stream_key_masked?: string;
+    is_active: boolean;
+    created_at: string;
+}
+
+export interface BroadcastSchedule {
+    broadcast_time: string | null;
+    broadcast_days: number[];
+    broadcast_timezone: string;
+}
+
+export interface SubscriptionData {
+    id: number;
+    plan: 'free' | 'starter' | 'pro' | 'enterprise';
+    plan_display?: string;
+    status?: string;
+    stx_address?: string;
+    is_active: boolean;
+    expires_at: string | null;
+    current_period_end: string | null;
+}
+
+// --- Playout & Subscription Constants ---
+
+export const PLATFORM_LABELS: Record<string, string> = {
+    youtube: 'YouTube Live',
+    twitch: 'Twitch',
+    twitter: 'X / Twitter',
+    facebook: 'Facebook Live',
+    kick: 'Kick',
+    rumble: 'Rumble',
+    other: 'Custom RTMP'
+};
+
+export const DEFAULT_RTMP_URLS: Record<string, string> = {
+    youtube: 'rtmp://a.rtmp.youtube.com/live2',
+    twitch: 'rtmp://live.twitch.tv/app/',
+    twitter: 'rtmps://live-upload.instagram.com:443/rtmp/',
+    kick: 'rtmps://fa7d151a67.global-contribute.live-video.net:443/app/',
+    other: ''
+};
+
+export const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+export const PLAN_LIMITS = {
+    free: { label: 'Free', rtmp_destinations: 0, playlists: 1 },
+    starter: { label: 'Starter', rtmp_destinations: 1, playlists: 5 },
+    pro: { label: 'Pro', rtmp_destinations: 3, playlists: 15 },
+    enterprise: { label: 'Enterprise', rtmp_destinations: 10, playlists: -1 }
+};
+
 
 // Fetch all shows
 export const fetchShows = async (status: string = 'published'): Promise<Show[]> => {
@@ -208,11 +337,41 @@ export const updateUserProfile = async (
     return await response.json();
 };
 
+// --- User Profile Functions ---
+
+// Get user by ID
+export const fetchUserById = async (userId: number | string): Promise<any> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/`);
+        if (!response.ok) throw new Error('User not found');
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching user:', error);
+        throw error;
+    }
+};
+
+// Aliases for creator detail compatibility
+export const fetchCreatorById = fetchUserById;
+
+export const fetchCreatorByUsername = async (username: string): Promise<Creator> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/users/by-username/${username}/`);
+        if (!response.ok) throw new Error('Creator not found');
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching creator by username:', error);
+        throw error;
+    }
+};
+
+
 
 
 // Events Types and Functions
 export interface Event {
     id: number;
+    slug?: string;
     title: string;
     description: string;
     banner_image: string | null;
@@ -271,7 +430,7 @@ export const fetchUpcomingEvents = async (): Promise<Event[]> => {
     }
 };
 
-export const fetchEventById = async (id: number): Promise<Event> => {
+export const fetchEventById = async (id: number | string): Promise<Event> => {
     try {
         const response = await fetch(`${API_BASE_URL}/events/${id}/`);
         if (!response.ok) throw new Error(`Failed to fetch event: ${response.statusText}`);
@@ -290,9 +449,13 @@ export interface Creator {
     profile_picture: string | null;
     cover_photo: string | null;
     website: string | null;
+    twitter?: string | null;
+    instagram?: string | null;
+    youtube?: string | null;
     is_verified: boolean;
     role: 'user' | 'creator';
     follower_count: number;
+    following_count?: number;
 }
 
 // Creator Statistics Interface
@@ -319,16 +482,6 @@ export const fetchCreators = async (): Promise<Creator[]> => {
     }
 };
 
-export const fetchCreatorById = async (id: number): Promise<Creator> => {
-    try {
-        const response = await fetch(`${API_BASE_URL}/users/${id}/`);
-        if (!response.ok) throw new Error(`Failed to fetch creator: ${response.statusText}`);
-        return await response.json();
-    } catch (error) {
-        console.error('Error fetching creator:', error);
-        throw error;
-    }
-};
 
 // News Types and Functions
 export interface News {
@@ -446,16 +599,6 @@ export const fetchUserLikedEvents = async (userId: number, accessToken?: string)
     }
 };
 
-// Creator-specific data
-export interface CreatorStats {
-    total_views: number;
-    total_likes: number;
-    total_comments: number;
-    follower_count: number;
-    following_count: number;
-    show_count: number;
-    event_count: number;
-}
 
 export const fetchCreatorShows = async (creatorId: number, accessToken?: string, status?: string): Promise<Show[]> => {
     try {
@@ -475,6 +618,23 @@ export const fetchCreatorShows = async (creatorId: number, accessToken?: string,
     }
 };
 
+export const fetchMyShows = async (accessToken: string): Promise<Show[]> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/shows/my_shows/`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+            }
+        });
+        if (!response.ok) throw new Error(`Failed to fetch my shows: ${response.statusText}`);
+        const data = await response.json();
+        return data.results || data || [];
+    } catch (error) {
+        console.error('Error fetching my shows:', error);
+        throw error;
+    }
+};
+
+
 export const fetchCreatorEvents = async (creatorId: number, accessToken?: string): Promise<Event[]> => {
     try {
         const headers: HeadersInit = {};
@@ -492,42 +652,22 @@ export const fetchCreatorEvents = async (creatorId: number, accessToken?: string
     }
 };
 
-export const fetchCreatorStats = async (creatorId: number, accessToken?: string): Promise<CreatorStats> => {
+export const fetchMyEvents = async (accessToken: string): Promise<Event[]> => {
     try {
-        const headers: HeadersInit = {};
-        if (accessToken) {
-            headers['Authorization'] = `Bearer ${accessToken}`;
-        }
-
-        const response = await fetch(`${API_BASE_URL}/users/${creatorId}/stats/`, { headers });
-        if (!response.ok) {
-            console.warn('Stats endpoint not available, using minimal data');
-            return {
-                total_views: 0,
-                total_shares: 0,
-                total_likes: 0,
-                total_comments: 0,
-                follower_count: 0,
-                following_count: 0,
-                show_count: 0,
-                event_count: 0,
-            };
-        }
-        return await response.json();
+        const response = await fetch(`${API_BASE_URL}/events/my_events/`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+            }
+        });
+        if (!response.ok) throw new Error(`Failed to fetch my events: ${response.statusText}`);
+        const data = await response.json();
+        return data.results || data || [];
     } catch (error) {
-        console.error('Error fetching creator stats:', error);
-        return {
-            total_views: 0,
-            total_shares: 0,
-            total_likes: 0,
-            total_comments: 0,
-            follower_count: 0,
-            following_count: 0,
-            show_count: 0,
-            event_count: 0,
-        };
+        console.error('Error fetching my events:', error);
+        throw error;
     }
 };
+
 
 // Create/Update/Delete Show
 export interface CreateShowPayload {
@@ -746,9 +886,72 @@ export const fetchShowBySlug = async (slug: string): Promise<Show> => {
     }
 };
 
-// Legacy function for backward compatibility (redirects to slug-based)
+// legacy function for backward compatibility (redirects to slug-based)
 export const fetchShowById = async (id: number | string): Promise<Show> => {
     return fetchShowBySlug(String(id));
+};
+
+// --- Show Episodes API ---
+export interface ShowEpisode {
+    id: number;
+    show: number;
+    episode_number: number;
+    title: string;
+    description: string;
+    air_date: string;
+    duration: string | null;
+    video_url: string | null;
+    is_premium?: boolean;
+    price_stx?: number;
+    price_usdcx?: number;
+    created_at?: string;
+}
+
+export const fetchEpisodes = async (showId: number): Promise<ShowEpisode[]> => {
+    const response = await fetch(`${API_BASE_URL}/episodes/?show=${showId}`);
+    if (!response.ok) throw new Error('Failed to fetch episodes');
+    const data = await response.json();
+    return Array.isArray(data) ? data : (data.results || []);
+};
+
+export const fetchShowEpisodes = async (showSlug: string): Promise<ShowEpisode[]> => {
+    const response = await fetch(`${API_BASE_URL}/shows/${showSlug}/episodes/`);
+    if (!response.ok) throw new Error('Failed to fetch show episodes');
+    return await response.json();
+};
+
+export const createEpisode = async (data: Partial<ShowEpisode>, token: string): Promise<ShowEpisode> => {
+    const response = await fetch(`${API_BASE_URL}/episodes/`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Failed to create episode');
+    return response.json();
+};
+
+export const updateEpisode = async (id: number, data: Partial<ShowEpisode>, token: string): Promise<ShowEpisode> => {
+    const response = await fetch(`${API_BASE_URL}/episodes/${id}/`, {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Failed to update episode');
+    return response.json();
+};
+
+export const deleteEpisode = async (id: number, token: string): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/episodes/${id}/`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Failed to delete episode');
 };
 
 // Fetch show by numeric PK (for notification routing where we only have the ID)
@@ -883,20 +1086,63 @@ export const addEventComment = async (eventId: number, text: string, accessToken
 // For all content types (Shows, News, Events)
 // ==============================================
 
-// Content Type IDs (from Django ContentType model)
-// These map to the content types in the backend
+// Content Type IDs Cache
+let CONTENT_TYPE_CACHE: { model: string; id: number }[] | null = null;
+
+/**
+ * Dynamically fetch ContentType IDs from the backend.
+ * This ensures compatibility between local and production environments
+ * where IDs are often different.
+ */
+export const getContentTypeId = async (modelName: string): Promise<number> => {
+    // 1. Check cache first
+    if (CONTENT_TYPE_CACHE) {
+        const found = CONTENT_TYPE_CACHE.find(ct => ct.model === modelName.toLowerCase());
+        if (found) return found.id;
+    }
+
+    // 2. Fetch from backend
+    try {
+        const response = await fetch(`${API_BASE_URL}/likes/content_types/`);
+        if (response.ok) {
+            const data = await response.json();
+            if (Array.isArray(data)) {
+                CONTENT_TYPE_CACHE = data;
+                const found = data.find((ct: any) => ct.model === modelName.toLowerCase());
+                if (found) return found.id;
+            }
+        }
+    } catch (error) {
+        console.warn('Failed to fetch content types, falling back to defaults:', error);
+    }
+
+    // 3. Fallback to hardcoded defaults
+    const fallbacks: Record<string, number> = {
+        show: Number(import.meta.env.VITE_CONTENT_TYPE_SHOW || 13),
+        news: Number(import.meta.env.VITE_CONTENT_TYPE_NEWS || 11),
+        event: Number(import.meta.env.VITE_CONTENT_TYPE_EVENT || 12),
+        post: Number(import.meta.env.VITE_CONTENT_TYPE_POST || 15),
+    };
+
+    return fallbacks[modelName.toLowerCase()] || 0;
+};
+
 export const CONTENT_TYPES = {
-    SHOW: Number(import.meta.env.VITE_CONTENT_TYPE_SHOW || 13),    // ContentType ID for Show model
-    NEWS: Number(import.meta.env.VITE_CONTENT_TYPE_NEWS || 11),    // ContentType ID for News model
-    EVENT: Number(import.meta.env.VITE_CONTENT_TYPE_EVENT || 12)   // ContentType ID for Event model
+    SHOW: Number(import.meta.env.VITE_CONTENT_TYPE_SHOW || 13),
+    NEWS: Number(import.meta.env.VITE_CONTENT_TYPE_NEWS || 11),
+    EVENT: Number(import.meta.env.VITE_CONTENT_TYPE_EVENT || 12)
 };
 
 // Toggle like/unlike (works for any content type)
 export const toggleLike = async (
-    contentType: number,
+    contentType: number | string,
     objectId: number,
     accessToken: string
-): Promise<{ status: 'liked' | 'unliked' }> => {
+): Promise<{ status: 'liked' | 'unliked'; like?: any }> => {
+    const ctId = typeof contentType === 'string' 
+        ? await getContentTypeId(contentType) 
+        : contentType;
+
     const response = await fetch(`${API_BASE_URL}/likes/toggle/`, {
         method: 'POST',
         headers: {
@@ -904,7 +1150,7 @@ export const toggleLike = async (
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            content_type: contentType,
+            content_type: ctId,
             object_id: objectId
         })
     });
@@ -914,13 +1160,17 @@ export const toggleLike = async (
 
 // Check if user has liked content
 export const checkIfLiked = async (
-    contentType: number,
+    contentType: number | string,
     objectId: number,
     userId: number
 ): Promise<boolean> => {
+    const ctId = typeof contentType === 'string' 
+        ? await getContentTypeId(contentType) 
+        : contentType;
+
     try {
         const response = await fetch(
-            `${API_BASE_URL}/likes/?content_type=${contentType}&object_id=${objectId}&user=${userId}`
+            `${API_BASE_URL}/likes/?content_type=${ctId}&object_id=${objectId}&user=${userId}`
         );
         if (!response.ok) return false;
         const data = await response.json();
@@ -941,22 +1191,24 @@ export const checkIfLiked = async (
 
 // Fetch comments for any content type
 export const fetchComments = async (
-    contentType: number,
+    contentType: number | string,
     objectId: number,
     topLevel: boolean = true,
     accessToken?: string
 ): Promise<Comment[]> => {
+    const ctId = typeof contentType === 'string'
+        ? await getContentTypeId(contentType)
+        : contentType;
+
     try {
-        const url = topLevel
-            ? `${API_BASE_URL}/comments/?content_type=${contentType}&object_id=${objectId}&top_level=true`
-            : `${API_BASE_URL}/comments/?content_type=${contentType}&object_id=${objectId}`;
+        const url = new URL(`${API_BASE_URL}/comments/`);
+        url.searchParams.append('content_type', ctId.toString());
+        url.searchParams.append('object_id', objectId.toString());
+        if (topLevel) url.searchParams.append('top_level', 'true');
 
-        const headers: Record<string, string> = {};
-        if (accessToken) {
-            headers['Authorization'] = `Bearer ${accessToken}`;
-        }
-
-        const response = await fetch(url, { headers });
+        const response = await fetch(url.toString(), {
+            headers: accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}
+        });
         if (!response.ok) throw new Error('Failed to fetch comments');
         const data = await response.json();
         return data.results || [];
@@ -968,12 +1220,16 @@ export const fetchComments = async (
 
 // Create a comment (works for any content type)
 export const createComment = async (
-    contentType: number,
+    contentType: number | string,
     objectId: number,
     text: string,
     accessToken: string,
     parentId?: number
 ): Promise<Comment> => {
+    const ctId = typeof contentType === 'string'
+        ? await getContentTypeId(contentType)
+        : contentType;
+
     const response = await fetch(`${API_BASE_URL}/comments/`, {
         method: 'POST',
         headers: {
@@ -981,7 +1237,7 @@ export const createComment = async (
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            content_type: contentType,
+            content_type: ctId,
             object_id: objectId,
             text,
             parent: parentId || null
@@ -1571,3 +1827,609 @@ export const declineGuestRequest = async (requestId: number, accessToken: string
     return await response.json();
 };
 
+// --- Community Posts ---
+
+export interface CreatorPost {
+    id: number;
+    author: {
+        id: number;
+        username: string;
+        profile_image?: string;
+    };
+    content: string;
+    image?: string;
+    is_pinned: boolean;
+    created_at: string;
+    updated_at: string;
+    like_count: number;
+    comment_count: number;
+    user_has_liked: boolean;
+    is_premium: boolean;
+    price_stx: string;
+    price_usdcx: string;
+}
+
+export const fetchPosts = async (params: { author?: number; page?: number } = {}, accessToken?: string): Promise<any> => {
+    try {
+        const headers: HeadersInit = {};
+        if (accessToken) {
+            headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+
+        const queryParams = new URLSearchParams();
+        if (params.author) queryParams.append('author', params.author.toString());
+        if (params.page) queryParams.append('page', params.page.toString());
+
+        const { response } = await x402Fetch(`${API_BASE_URL}/posts/?${queryParams.toString()}`, { headers });
+        if (!response.ok) throw new Error(`Failed to fetch posts: ${response.statusText}`);
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching posts:', error);
+        throw error;
+    }
+};
+
+export const fetchPersonalizedFeed = async (accessToken: string): Promise<any> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/posts/feed/`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (!response.ok) throw new Error(`Failed to fetch feed: ${response.statusText}`);
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching feed:', error);
+        throw error;
+    }
+};
+
+export const fetchMyArticles = async (accessToken: string): Promise<News[]> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/news/my_articles/`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (!response.ok) throw new Error(`Failed to fetch my articles: ${response.statusText}`);
+        const data = await response.json();
+        return data.results || data || [];
+    } catch (error) {
+        console.error('Error fetching my articles:', error);
+        throw error;
+    }
+};
+
+
+export const createPost = async (formData: FormData, accessToken: string): Promise<CreatorPost> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/posts/`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}` },
+            body: formData
+        });
+        if (!response.ok) throw new Error(`Failed to create post: ${response.statusText}`);
+        return await response.json();
+    } catch (error) {
+        console.error('Error creating post:', error);
+        throw error;
+    }
+};
+
+export const updatePost = async (postId: number, formData: FormData, accessToken: string): Promise<CreatorPost> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/posts/${postId}/`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${accessToken}` },
+            body: formData
+        });
+        if (!response.ok) throw new Error(`Failed to update post: ${response.statusText}`);
+        return await response.json();
+    } catch (error) {
+        console.error('Error updating post:', error);
+        throw error;
+    }
+};
+
+export const deletePost = async (postId: number, accessToken: string): Promise<void> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/posts/${postId}/`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (!response.ok) throw new Error(`Failed to delete post: ${response.statusText}`);
+    } catch (error) {
+        console.error('Error deleting post:', error);
+        throw error;
+    }
+};
+
+export const fetchCreatorStats = async (creatorId: number, accessToken?: string): Promise<CreatorStats> => {
+    try {
+        const headers: HeadersInit = {};
+        if (accessToken) {
+            headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/users/${creatorId}/stats/`, { headers });
+        if (!response.ok) {
+            console.warn('Stats endpoint not available, using minimal data');
+            return {
+                total_views: 0,
+                total_shares: 0,
+                total_likes: 0,
+                total_comments: 0,
+                follower_count: 0,
+                following_count: 0,
+                show_count: 0,
+                event_count: 0,
+            };
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching creator stats:', error);
+        return {
+            total_views: 0,
+            total_shares: 0,
+            total_likes: 0,
+            total_comments: 0,
+            follower_count: 0,
+            following_count: 0,
+            show_count: 0,
+            event_count: 0,
+        };
+    }
+};
+
+// --- Messaging & Threads ---
+
+export interface Thread {
+    id: number;
+    participants: {
+        id: number;
+        username: string;
+        profile_picture?: string;
+    }[];
+    created_at: string;
+    is_paygated: boolean;
+    price_stx: string;
+    price_usdcx: string;
+    last_message?: Message;
+    last_message_at?: string;
+    unread_count: number;
+}
+
+export interface Message {
+    id: number;
+    thread: number;
+    sender: {
+        id: number;
+        username: string;
+        profile_picture?: string;
+    };
+    body: string;
+    sent_at: string;
+}
+
+export const fetchThreads = async (accessToken: string): Promise<Thread[]> => {
+    try {
+        const { response } = await x402Fetch(`${API_BASE_URL}/messages/threads/`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (!response.ok) throw new Error('Failed to fetch threads');
+        const data = await response.json();
+        return data.results || data;
+    } catch (error) {
+        console.error('Error fetching threads:', error);
+        throw error;
+    }
+};
+
+export const fetchMessages = async (threadId: number, accessToken: string): Promise<Message[]> => {
+    try {
+        const { response } = await x402Fetch(`${API_BASE_URL}/messages/threads/${threadId}/messages/`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (!response.ok) throw new Error('Failed to fetch messages');
+        const data = await response.json();
+        return data.results || data;
+    } catch (error) {
+        console.error('Error fetching messages:', error);
+        throw error;
+    }
+};
+
+export const sendMessage = async (threadId: number, body: string, accessToken: string): Promise<Message> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/messages/threads/${threadId}/messages/`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ body })
+        });
+        if (!response.ok) throw new Error('Failed to send message');
+        return await response.json();
+    } catch (error) {
+        console.error('Error sending message:', error);
+        throw error;
+    }
+};
+
+// --- Merch & Orders (Added back) ---
+
+export const fetchOrders = async (token: string): Promise<Order[]> => {
+    const resp = await fetch(`${API_BASE_URL}/orders/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error('Failed to fetch orders');
+    const data = await resp.json();
+    return Array.isArray(data) ? data : data.results || [];
+};
+
+export const createOrder = async (data: Partial<Order>, token: string, options?: Partial<X402PaymentOptions>): Promise<Order & { tx_id?: string }> => {
+    const { response, txId } = await x402Fetch(`${API_BASE_URL}/orders/`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    }, options);
+    if (!response.ok) throw new Error('Failed to create order');
+    const result = await response.json();
+    return { ...result, tx_id: txId || result.tx_id };
+};
+
+export const createMerchOrder = createOrder;
+
+export const fetchMerchList = async (creatorId?: number): Promise<Merch[]> => {
+    const url = creatorId ? `${API_BASE_URL}/merch/?creator=${creatorId}` : `${API_BASE_URL}/merch/`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('Failed to fetch merch');
+    const data = await resp.json();
+    return Array.isArray(data) ? data : data.results || [];
+};
+
+export const fetchCreatorMerchAdmin = async (accessToken: string): Promise<Merch[]> => {
+    const resp = await fetch(`${API_BASE_URL}/merch/my_merch/`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    if (!resp.ok) throw new Error('Failed to fetch admin merch');
+    const data = await resp.json();
+    return Array.isArray(data) ? data : data.results || [];
+};
+
+export const createMerchItem = async (formData: FormData, accessToken: string): Promise<Merch> => {
+    const resp = await fetch(`${API_BASE_URL}/merch/`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`
+        },
+        body: formData
+    });
+    if (!resp.ok) throw new Error('Failed to create merch item');
+    return resp.json();
+};
+
+export const updateMerchItem = async (merchSlug: string, formData: FormData, accessToken: string): Promise<Merch> => {
+    const resp = await fetch(`${API_BASE_URL}/merch/${merchSlug}/`, {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`
+        },
+        body: formData
+    });
+    if (!resp.ok) throw new Error('Failed to update merch item');
+    return resp.json();
+};
+
+export const deleteMerchItem = async (merchSlug: string, accessToken: string): Promise<void> => {
+    const resp = await fetch(`${API_BASE_URL}/merch/${merchSlug}/`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`
+        }
+    });
+    if (!resp.ok) throw new Error('Failed to delete merch item');
+};
+// --- Playout Engine (DCPE) API ---
+
+export const dcpeHealth = async (token: string): Promise<any> => {
+    const opsBaseUrl = API_BASE_URL.replace('/api', '') + '/ops';
+    const resp = await fetch(`${opsBaseUrl}/health/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return resp.json();
+};
+
+export const dcpeStatus = async (token: string): Promise<DCPEStatus> => {
+    const opsBaseUrl = API_BASE_URL.replace('/api', '') + '/ops';
+    const resp = await fetch(`${opsBaseUrl}/status/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error('Failed to fetch DCPE status');
+    return resp.json();
+};
+
+export const dcpePlaylists = async (token: string): Promise<{ playlists: DCPEPlaylist[] }> => {
+    const opsBaseUrl = API_BASE_URL.replace('/api', '') + '/ops';
+    const resp = await fetch(`${opsBaseUrl}/playlists/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error('Failed to fetch playlists');
+    return resp.json();
+};
+
+export const dcpeSetPlaylist = async (playlistId: string, token: string): Promise<any> => {
+    const opsBaseUrl = API_BASE_URL.replace('/api', '') + '/ops';
+    const resp = await fetch(`${opsBaseUrl}/set-playlist/`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ playlist_id: playlistId })
+    });
+    if (!resp.ok) throw new Error('Failed to set playlist');
+    return resp.json();
+};
+
+export const dcpeAdvance = async (token: string): Promise<any> => {
+    const opsBaseUrl = API_BASE_URL.replace('/api', '') + '/ops';
+    const resp = await fetch(`${opsBaseUrl}/advance/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error('Failed to advance content');
+    return resp.json();
+};
+
+export const dcpeStreamStart = async (token: string): Promise<any> => {
+    const opsBaseUrl = API_BASE_URL.replace('/api', '') + '/ops';
+    const resp = await fetch(`${opsBaseUrl}/stream-start/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error('Failed to start stream');
+    return resp.json();
+};
+
+export const dcpeStreamStop = async (token: string): Promise<any> => {
+    const opsBaseUrl = API_BASE_URL.replace('/api', '') + '/ops';
+    const resp = await fetch(`${opsBaseUrl}/stream-stop/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error('Failed to stop stream');
+    return resp.json();
+};
+
+export const dcpeCreateFolder = async (name: string, token: string): Promise<any> => {
+    const opsBaseUrl = API_BASE_URL.replace('/api', '') + '/ops';
+    const resp = await fetch(`${opsBaseUrl}/create-folder/`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name })
+    });
+    if (!resp.ok) throw new Error('Failed to create folder');
+    return resp.json();
+};
+
+export const dcpeUpload = async (files: File[], token: string): Promise<any> => {
+    const formData = new FormData();
+    files.forEach(file => formData.append('files', file));
+    
+    const opsBaseUrl = API_BASE_URL.replace('/api', '') + '/ops';
+    const resp = await fetch(`${opsBaseUrl}/upload/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+    });
+    if (!resp.ok) throw new Error('Failed to upload files');
+    return resp.json();
+};
+// --- RTMP Destinations API ---
+
+export const fetchRTMPDestinations = async (token: string): Promise<RTMPDestination[]> => {
+    const resp = await fetch(`${API_BASE_URL}/rtmp-destinations/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error('Failed to fetch RTMP destinations');
+    const data = await resp.json();
+    return Array.isArray(data) ? data : data.results || [];
+};
+
+export const createRTMPDestination = async (data: Partial<RTMPDestination>, token: string): Promise<RTMPDestination> => {
+    const resp = await fetch(`${API_BASE_URL}/rtmp-destinations/`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    });
+    if (!resp.ok) throw new Error('Failed to create RTMP destination');
+    return resp.json();
+};
+
+export const updateRTMPDestination = async (id: number, data: Partial<RTMPDestination>, token: string): Promise<RTMPDestination> => {
+    const resp = await fetch(`${API_BASE_URL}/rtmp-destinations/${id}/`, {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    });
+    if (!resp.ok) throw new Error('Failed to update RTMP destination');
+    return resp.json();
+};
+
+export const deleteRTMPDestination = async (id: number, token: string): Promise<void> => {
+    const resp = await fetch(`${API_BASE_URL}/rtmp-destinations/${id}/`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error('Failed to delete RTMP destination');
+};
+
+// --- Broadcast Schedule API ---
+
+export const fetchBroadcastSchedule = async (token: string): Promise<BroadcastSchedule> => {
+    const resp = await fetch(`${API_BASE_URL}/broadcast-schedule/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error('Failed to fetch broadcast schedule');
+    return resp.json();
+};
+
+export const updateBroadcastSchedule = async (data: Partial<BroadcastSchedule>, token: string): Promise<BroadcastSchedule> => {
+    const resp = await fetch(`${API_BASE_URL}/broadcast-schedule/`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    });
+    if (!resp.ok) throw new Error('Failed to update broadcast schedule');
+    return resp.json();
+};
+
+// --- Subscriptions API ---
+
+export const fetchSubscription = async (token: string): Promise<SubscriptionData> => {
+    const resp = await fetch(`${API_BASE_URL}/subscription/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error('Failed to fetch subscription');
+    return resp.json();
+};
+
+// --- Subscription Upgrade (x402-gated) ---
+
+export const upgradeSubscription = async (
+    plan: string, token: string, options?: Partial<X402PaymentOptions>
+): Promise<SubscriptionData & { tx_id?: string }> => {
+    const { response, txId } = await x402Fetch(`${API_BASE_URL}/subscription/upgrade/`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ plan })
+    }, options);
+    if (!response.ok) throw new Error('Failed to upgrade subscription');
+    const result = await response.json();
+    return { ...result, tx_id: txId };
+};
+
+// --- Tip API (Phase 13) ---
+
+export interface TipPaymentInfo {
+    creator_id: number;
+    creator_username: string;
+    creator_display_name: string;
+    pay_to: string;
+    profile_picture: string | null;
+}
+
+export const fetchTipPaymentInfo = async (creatorId: number, token: string): Promise<TipPaymentInfo> => {
+    const resp = await fetch(`${API_BASE_URL}/tips/${creatorId}/payment-info/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error('Failed to fetch tip payment info');
+    return resp.json();
+};
+
+export const sendTip = async (
+    creatorId: number,
+    amountStx: number,
+    amountUsdcx: number,
+    token: string,
+    options?: Partial<X402PaymentOptions>,
+    amountSbtc: number = 0
+): Promise<any> => {
+    const { response, txId } = await x402Fetch(`${API_BASE_URL}/tips/${creatorId}/send/`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ amount_stx: amountStx, amount_usdcx: amountUsdcx, amount_sbtc: amountSbtc })
+    }, options);
+    if (!response.ok) throw new Error('Failed to send tip');
+    const result = await response.json();
+    return { ...result, tx_id: txId || result.tx_id };
+};
+
+// --- Merch Orders API (Phase 11) ---
+
+export const fetchCreatorOrders = async (token: string): Promise<Order[]> => {
+    const resp = await fetch(`${API_BASE_URL}/orders/mine/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!resp.ok) throw new Error('Failed to fetch creator orders');
+    const data = await resp.json();
+    return Array.isArray(data) ? data : data.results || [];
+};
+
+export const updateOrderStatus = async (orderId: number, newStatus: string, token: string): Promise<Order> => {
+    const resp = await fetch(`${API_BASE_URL}/orders/${orderId}/update-status/`, {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+    });
+    if (!resp.ok) throw new Error('Failed to update order status');
+    return resp.json();
+};
+
+// --- DM Preferences (Phase 10) ---
+
+export interface DMPreferences {
+    dm_paygate_enabled: boolean;
+    dm_price_stx: number;
+    dm_price_usdcx: number;
+}
+
+export const updateDMPreferences = async (data: Partial<DMPreferences>, token: string): Promise<any> => {
+    const resp = await fetch(`${API_BASE_URL}/users/me/`, {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    });
+    if (!resp.ok) throw new Error('Failed to update DM preferences');
+    return resp.json();
+};
+
+// --- Thread helper (Phase 9) ---
+
+export const findOrCreateThread = async (participantId: number, token: string): Promise<any> => {
+    // First check if a thread already exists
+    const listResp = await fetch(`${API_BASE_URL}/messages/threads/?participant=${participantId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (listResp.ok) {
+        const threads = await listResp.json();
+        const list = Array.isArray(threads) ? threads : threads.results || [];
+        if (list.length > 0) return list[0];
+    }
+    // Create a new thread
+    const createResp = await fetch(`${API_BASE_URL}/messages/threads/`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ recipient_id: participantId })
+    });
+    if (!createResp.ok) throw new Error('Failed to create thread');
+    return createResp.json();
+};

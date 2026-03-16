@@ -8,6 +8,7 @@ import {
 import { motion } from 'framer-motion';
 import { useAuth } from '../lib/AuthContext';
 import { FollowersList } from './FollowersList';
+import { MessagingInbox } from './MessagingInbox';
 import {
    fetchUserProfile,
    fetchUserFollowing,
@@ -27,7 +28,7 @@ interface UserDashboardProps {
 
 export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
    const { backendUser, accessToken, logout } = useAuth();
-   const [activeTab, setActiveTab] = useState<'history' | 'liked' | 'activity'>('liked');
+   const [activeTab, setActiveTab] = useState<'history' | 'liked' | 'activity' | 'messages'>('liked');
 
    // Followers modal
    const [showFollowersModal, setShowFollowersModal] = useState(false);
@@ -144,19 +145,19 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
    };
 
    return (
-      <div className="min-h-screen pt-24 pb-20 container max-w-[1024px] mx-auto px-6 space-y-8">
+      <div className="min-h-screen pt-24 pb-20 container max-w-[1024px] mx-auto px-4 md:px-6 space-y-8">
 
          {/* Header */}
-         <div className="flex justify-between items-end">
+         <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-3">
             <div>
-               <h1 className="text-4xl font-bold text-ink mb-2">My Dashboard</h1>
-               <p className="text-inkLight font-medium">
+               <h1 className="text-2xl md:text-4xl font-bold text-ink mb-1 md:mb-2">My Dashboard</h1>
+               <p className="text-inkLight font-medium text-sm md:text-base">
                   Welcome back, {backendUser.username || 'User'}.
                </p>
             </div>
             <button
                onClick={logout}
-               className="flex items-center gap-2 text-sm font-bold text-ink hover:text-red-500 transition-colors"
+               className="flex items-center gap-2 text-sm font-bold text-ink hover:text-red-500 transition-colors self-start sm:self-auto"
             >
                <LogOut className="w-4 h-4" /> Sign Out
             </button>
@@ -332,21 +333,22 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                <section className="bg-canvas border border-borderSubtle rounded-3xl p-6 shadow-soft min-h-[500px]">
 
                   {/* Tab Navigation */}
-                  <div className="flex items-center gap-6 border-b border-borderSubtle pb-4 mb-6">
+                  <div className="flex items-center gap-3 md:gap-6 border-b border-borderSubtle pb-4 mb-6 overflow-x-auto no-scrollbar">
                      {[
                         { id: 'liked', label: 'Liked Shows', icon: Heart },
                         { id: 'history', label: 'Watch History', icon: Clock },
                         { id: 'activity', label: 'Activity Feed', icon: Zap },
+                        { id: 'messages', label: 'Messages', icon: MessageSquare },
                      ].map((tab) => (
                         <button
                            key={tab.id}
                            onClick={() => setActiveTab(tab.id as any)}
-                           className={`flex items-center gap-2 text-sm font-bold pb-4 -mb-8 transition-all relative ${activeTab === tab.id
+                           className={`flex items-center gap-1.5 md:gap-2 text-xs md:text-sm font-bold pb-4 -mb-8 transition-all relative whitespace-nowrap shrink-0 ${activeTab === tab.id
                               ? 'text-ink'
                               : 'text-inkLight hover:text-ink'
                               }`}
                         >
-                           <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-gold' : ''}`} />
+                           <tab.icon className={`w-3.5 h-3.5 md:w-4 md:h-4 ${activeTab === tab.id ? 'text-gold' : ''}`} />
                            {tab.label}
                            {activeTab === tab.id && (
                               <motion.div layoutId="activeTab" className="absolute bottom-4 left-0 w-full h-0.5 bg-gold" />
@@ -527,6 +529,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                               </div>
                            )}
                         </>
+                     )}
+
+                     {activeTab === 'messages' && (
+                        <div className="mt-2">
+                           <MessagingInbox />
+                        </div>
                      )}
 
                   </div>

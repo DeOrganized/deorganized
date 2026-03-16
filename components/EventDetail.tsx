@@ -8,17 +8,17 @@ import {
 import { useAuth } from '../lib/AuthContext';
 import {
     Event, Comment, fetchEventById,
-    toggleLike, checkIfLiked, CONTENT_TYPES,
+    toggleLike, checkIfLiked,
     fetchComments, createComment, deleteComment, updateComment,
     toggleFollow, checkIsFollowing
 } from '../lib/api';
 
 interface EventDetailProps {
-    eventId: number;
+    eventSlug: string;
     onNavigate: (page: string, id?: string | number) => void;
 }
 
-export const EventDetail: React.FC<EventDetailProps> = ({ eventId, onNavigate }) => {
+export const EventDetail: React.FC<EventDetailProps> = ({ eventSlug, onNavigate }) => {
     const { backendUser, accessToken } = useAuth();
 
     const [event, setEvent] = useState<Event | null>(null);
@@ -56,7 +56,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ eventId, onNavigate })
     const loadEvent = useCallback(async () => {
         try {
             setIsLoading(true);
-            const data = await fetchEventById(eventId);
+            const data = await fetchEventById(eventSlug);
             setEvent(data);
             setLikeCount(data.like_count || 0);
         } catch (err: any) {
@@ -64,7 +64,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ eventId, onNavigate })
         } finally {
             setIsLoading(false);
         }
-    }, [eventId]);
+    }, [eventSlug]);
 
     useEffect(() => { loadEvent(); }, [loadEvent]);
 
@@ -73,7 +73,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ eventId, onNavigate })
         const checkLike = async () => {
             if (!backendUser?.id || !event) return;
             try {
-                const liked = await checkIfLiked(CONTENT_TYPES.EVENT, event.id, backendUser.id);
+                const liked = await checkIfLiked('event', event.id, backendUser.id);
                 setIsLiked(liked);
             } catch { }
         };
@@ -98,7 +98,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ eventId, onNavigate })
         const loadComments = async () => {
             if (!event) return;
             try {
-                const data = await fetchComments(CONTENT_TYPES.EVENT, event.id, true, accessToken || undefined);
+                const data = await fetchComments('event', event.id, true, accessToken || undefined);
                 setComments(data);
             } catch { }
         };
@@ -108,7 +108,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ eventId, onNavigate })
     const handleLike = async () => {
         if (!accessToken || !event) return;
         try {
-            const result = await toggleLike(CONTENT_TYPES.EVENT, event.id, accessToken);
+            const result = await toggleLike('event', event.id, accessToken);
             setIsLiked(result.status === 'liked');
             setLikeCount(prev => result.status === 'liked' ? prev + 1 : prev - 1);
         } catch { showToastMsg('Failed to like event'); }
@@ -128,10 +128,10 @@ export const EventDetail: React.FC<EventDetailProps> = ({ eventId, onNavigate })
         if (!accessToken || !event || !commentText.trim()) return;
         setIsSubmittingComment(true);
         try {
-            await createComment(CONTENT_TYPES.EVENT, event.id, commentText, accessToken);
+            await createComment('event', event.id, commentText, accessToken);
 
             // Re-fetch comments to get full data with user info
-            const updatedComments = await fetchComments(CONTENT_TYPES.EVENT, event.id, true, accessToken);
+            const updatedComments = await fetchComments('event', event.id, true, accessToken);
             setComments(updatedComments);
             setCommentText('');
         } catch { showToastMsg('Failed to post comment'); }
@@ -149,7 +149,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ eventId, onNavigate })
 
             // Re-fetch comments to get full updated data
             if (event) {
-                const updatedComments = await fetchComments(CONTENT_TYPES.EVENT, event.id, true, accessToken);
+                const updatedComments = await fetchComments('event', event.id, true, accessToken);
                 setComments(updatedComments);
             }
             setEditingCommentId(null);
@@ -171,7 +171,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ eventId, onNavigate })
 
     const handleShare = () => {
         const url = window.location.origin;
-        navigator.clipboard.writeText(`${url}/events/${eventId}`);
+        navigator.clipboard.writeText(`${url}/events/${event?.slug || eventSlug}`);
         setShowSharePopup(true);
         setTimeout(() => setShowSharePopup(false), 2000);
     };
@@ -396,7 +396,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ eventId, onNavigate })
                     <div className="flex items-center justify-between bg-surface border border-borderSubtle rounded-xl p-4">
                         <div
                             className="flex items-center gap-3 cursor-pointer"
-                            onClick={() => onNavigate('creator-detail', event.organizer.id)}
+                            onClick={() => onNavigate('creator-detail', event.organizer.username)}
                         >
                             <div className="w-10 h-10 rounded-full overflow-hidden bg-canvas border border-borderSubtle">
                                 {event.organizer.profile_picture ? (
@@ -506,7 +506,7 @@ export const EventDetail: React.FC<EventDetailProps> = ({ eventId, onNavigate })
                                     <div key={comment.id} className="flex gap-3 group">
                                         <div
                                             className="w-8 h-8 rounded-full overflow-hidden bg-surface flex-shrink-0 cursor-pointer"
-                                            onClick={() => onNavigate('creator-detail', comment.user.id)}
+                                            onClick={() => onNavigate('creator-detail', comment.user.username)}
                                         >
                                             {comment.user.profile_picture ? (
                                                 <img src={comment.user.profile_picture} alt="" className="w-full h-full object-cover" />

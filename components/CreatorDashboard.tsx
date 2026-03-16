@@ -3,14 +3,14 @@ import {
    User, Settings, DollarSign, TrendingUp, Calendar as CalendarIcon,
    Plus, Users, Bell, Check, X, Clock, Video,
    BarChart3, ArrowUpRight, MoreHorizontal, Heart, MessageSquare,
-   Trophy, Loader2, ChevronLeft, ChevronRight, Repeat, ChevronDown, Crown
+   Trophy, Loader2, ChevronLeft, ChevronRight, Repeat, ChevronDown, Crown, Radio, Film
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { addMonths, subMonths, format } from 'date-fns';
 import { useAuth } from '../lib/AuthContext';
 import {
-   fetchCreatorShows,
-   fetchCreatorEvents,
+   fetchMyShows,
+   fetchMyEvents,
    fetchUserProfile,
    updateUserProfile,
    createShow,
@@ -31,18 +31,29 @@ import {
    GuestRequest,
    Tag
 } from '../lib/api';
+
 import { RealTimeCalendar } from './RealTimeCalendar';
 import { EditShowModal } from './EditShowModal';
 import { EditEventModal } from './EditEventModal';
 import { TagInput } from './TagInput';
 import { FollowersList } from './FollowersList';
+import { MerchTracker } from './CreatorDashboard/MerchTracker';
+import { CommunityPosts } from './CreatorDashboard/CommunityPosts';
+import { PlayoutControl } from './PlayoutControl';
+import { MessagingInbox } from './MessagingInbox';
+import EpisodeManager from './EpisodeManager';
+import { useToast } from './Toast';
 
 interface CreatorDashboardProps {
    onNavigate: (page: string, id?: string | number) => void;
 }
 
+type CreatorTab = 'studio' | 'live' | 'episodes' | 'merch' | 'community' | 'settings' | 'messages';
+
 export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }) => {
    const { backendUser, accessToken, logout } = useAuth();
+   const toast = useToast();
+   const [activeTab, setActiveTab] = useState<CreatorTab>('studio');
    const [showSuccessToast, setShowSuccessToast] = useState(false);
    const [toastMessage, setToastMessage] = useState('');
    const [toastType, setToastType] = useState<'success' | 'error'>('success');
@@ -103,6 +114,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
    // Edit event state
    const [eventToEdit, setEventToEdit] = useState<Event | null>(null);
    const [isEditEventModalOpen, setIsEditEventModalOpen] = useState(false);
+   const [selectedShowForEpisodes, setSelectedShowForEpisodes] = useState<Show | null>(null);
 
    // Create mode toggle (show vs event)
    const [createMode, setCreateMode] = useState<'show' | 'event'>('show');
@@ -148,12 +160,12 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
    // Fetch creator's shows
    useEffect(() => {
       const loadShows = async () => {
-         if (!backendUser?.id || !accessToken) return;
+         if (!accessToken) return;
 
          try {
             setIsLoadingShows(true);
-            const showsData = await fetchCreatorShows(backendUser.id, accessToken);
-            setShows(showsData);
+            const ownedShows = await fetchMyShows(accessToken);
+            setShows(ownedShows);
          } catch (error) {
             console.error('Failed to load shows:', error);
          } finally {
@@ -162,17 +174,18 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
       };
 
       loadShows();
-   }, [backendUser?.id, accessToken]);
+   }, [accessToken]);
+
 
    // Fetch creator's events
    useEffect(() => {
       const loadEvents = async () => {
-         if (!backendUser?.id || !accessToken) return;
+         if (!accessToken) return;
 
          try {
             setIsLoadingEvents(true);
-            const eventsData = await fetchCreatorEvents(backendUser.id, accessToken);
-            setEvents(eventsData);
+            const ownedEvents = await fetchMyEvents(accessToken);
+            setEvents(ownedEvents);
          } catch (error) {
             console.error('Failed to load events:', error);
          } finally {
@@ -181,7 +194,8 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
       };
 
       loadEvents();
-   }, [backendUser?.id, accessToken]);
+   }, [accessToken]);
+
 
    // Fetch guest requests
    useEffect(() => {
@@ -355,8 +369,8 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
          setCreateCoHosts([]); // Reset co-host state on success
 
          // Refresh shows list
-         if (backendUser?.id) {
-            const showsData = await fetchCreatorShows(backendUser.id, accessToken);
+         if (backendUser?.id && accessToken) {
+            const showsData = await fetchMyShows(accessToken);
             setShows(showsData);
          }
 
@@ -379,7 +393,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
       // Refresh shows list
       if (backendUser?.id && accessToken) {
          try {
-            const updated = await fetchCreatorShows(backendUser.id, accessToken);
+            const updated = await fetchMyShows(accessToken);
             setShows(updated);
          } catch (error) {
             console.error('Failed to refresh shows:', error);
@@ -396,7 +410,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
       // Refresh events list
       if (backendUser?.id && accessToken) {
          try {
-            const updated = await fetchCreatorEvents(backendUser.id, accessToken);
+            const updated = await fetchMyEvents(accessToken);
             setEvents(updated);
          } catch (error) {
             console.error('Failed to refresh events:', error);
@@ -421,21 +435,127 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
 
 
    return (
-      <div className="min-h-screen pt-24 pb-20 container max-w-[1024px] mx-auto px-6 space-y-8">
-
-         {/* Header */}
-         <div className="flex justify-between items-end">
-            <div>
-               <h1 className="text-4xl font-bold text-ink mb-2">Creator Studio</h1>
-               <p className="text-inkLight font-medium">Manage your content, earnings, and community.</p>
+      <div className="min-h-screen bg-canvas flex flex-col md:flex-row">
+         {/* Desktop Sidebar */}
+         <div className="hidden md:flex w-72 bg-surface border-r border-borderSubtle p-6 flex-col pt-28">
+            <div className="mb-8 px-2">
+               <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gold to-amber-500 flex items-center justify-center shadow-lg shadow-gold/20">
+                     <Video className="w-6 h-6 text-ink" />
+                  </div>
+                  <div>
+                     <h2 className="text-xl font-black text-ink">Creator Studio</h2>
+                     <p className="text-[10px] font-black text-gold uppercase tracking-widest">Dashboard</p>
+                  </div>
+               </div>
             </div>
+
+            <nav className="space-y-1.5 flex-1">
+               <button
+                  onClick={() => setActiveTab('studio')}
+                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'studio' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
+               >
+                  <BarChart3 className={`w-5 h-5 ${activeTab === 'studio' ? 'text-background' : ''}`} />
+                  Studio
+               </button>
+               <button
+                  onClick={() => setActiveTab('live')}
+                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'live' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
+               >
+                  <Radio className={`w-5 h-5 ${activeTab === 'live' ? 'text-background' : ''}`} />
+                  Live Controls
+               </button>
+               <button
+                  onClick={() => setActiveTab('episodes')}
+                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'episodes' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
+               >
+                  <Film className={`w-5 h-5 ${activeTab === 'episodes' ? 'text-background' : ''}`} />
+                  Show Episodes
+               </button>
+               <button
+                  onClick={() => setActiveTab('merch')}
+                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'merch' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
+               >
+                  <DollarSign className={`w-5 h-5 ${activeTab === 'merch' ? 'text-background' : ''}`} />
+                  Merch Hub
+               </button>
+               <button
+                  onClick={() => setActiveTab('community')}
+                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'community' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
+               >
+                  <Users className={`w-5 h-5 ${activeTab === 'community' ? 'text-background' : ''}`} />
+                  Community
+               </button>
+               <button
+                  onClick={() => setActiveTab('messages')}
+                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'messages' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
+               >
+                  <MessageSquare className={`w-5 h-5 ${activeTab === 'messages' ? 'text-background' : ''}`} />
+                  Messages
+               </button>
+               <button
+                  onClick={() => setActiveTab('settings')}
+                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'settings' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
+               >
+                  <Settings className={`w-5 h-5 ${activeTab === 'settings' ? 'text-background' : ''}`} />
+                  Preferences
+               </button>
+            </nav>
+
             <button
                onClick={logout}
-               className="hidden md:flex items-center gap-2 text-sm font-bold text-ink hover:text-red-500 transition-colors"
+               className="mt-auto flex items-center gap-3 px-4 py-3 text-sm font-bold text-inkLight hover:text-red-500 transition-colors"
             >
                <Settings className="w-4 h-4" /> Sign Out
             </button>
          </div>
+
+         {/* Mobile Tab Bar (horizontal scrollable) */}
+         <div className="md:hidden fixed top-16 left-0 right-0 z-30 bg-surface/95 backdrop-blur-lg border-b border-borderSubtle">
+            <div className="flex overflow-x-auto no-scrollbar px-3 py-2 gap-1.5">
+               {([
+                  { key: 'studio' as CreatorTab, icon: BarChart3, label: 'Studio' },
+                  { key: 'live' as CreatorTab, icon: Radio, label: 'Live' },
+                  { key: 'episodes' as CreatorTab, icon: Film, label: 'Episodes' },
+                  { key: 'merch' as CreatorTab, icon: DollarSign, label: 'Merch' },
+                  { key: 'community' as CreatorTab, icon: Users, label: 'Community' },
+                  { key: 'messages' as CreatorTab, icon: MessageSquare, label: 'Messages' },
+                  { key: 'settings' as CreatorTab, icon: Settings, label: 'Settings' },
+               ]).map(({ key, icon: Icon, label }) => (
+                  <button
+                     key={key}
+                     onClick={() => setActiveTab(key)}
+                     className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
+                        activeTab === key
+                           ? 'bg-gold text-background shadow-md'
+                           : 'text-inkLight hover:text-ink hover:bg-canvas'
+                     }`}
+                  >
+                     <Icon className="w-4 h-4" />
+                     {label}
+                  </button>
+               ))}
+            </div>
+         </div>
+
+         {/* Main Content Area */}
+         <div className="flex-1 overflow-y-auto pt-28 md:pt-28 p-4 md:p-12 custom-scrollbar">
+            <div className="max-w-6xl mx-auto">
+               <AnimatePresence mode="wait">
+                  {activeTab === 'studio' && (
+                     <motion.div
+                        key="studio"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="space-y-8"
+                     >
+                        <div className="flex justify-between items-end">
+                           <div>
+                              <h1 className="text-4xl font-bold text-ink mb-2">Creator Hub</h1>
+                              <p className="text-inkLight font-medium">Manage your content, earnings, and community.</p>
+                           </div>
+                        </div>
 
          {/* 1. Profile Overview Card */}
          <section className="bg-canvas border border-borderSubtle rounded-3xl p-6 md:p-8 shadow-soft relative overflow-hidden">
@@ -1175,7 +1295,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                                              setGuestRequests(prev => prev.filter(r => r.id !== request.id));
                                           } catch (error) {
                                              console.error('Failed to decline:', error);
-                                             alert('Failed to decline request.');
+                                             toast.error('Failed to decline request.');
                                           }
                                        }}
                                        className="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full transition-all flex items-center justify-center gap-1"
@@ -1567,8 +1687,9 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                   setIsEditModalOpen(false);
                   setShowToEdit(null);
                }}
-               onSuccess={handleEditSuccess}
-            />
+                onSuccess={handleEditSuccess}
+                isOwner={showToEdit.creator.id == backendUser?.id}
+             />
          )}
 
          {/* Edit Event Modal */}
@@ -1580,9 +1701,150 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                   setIsEditEventModalOpen(false);
                   setEventToEdit(null);
                }}
-               onSuccess={handleEditEventSuccess}
-            />
+                onSuccess={handleEditEventSuccess}
+                isOwner={eventToEdit.organizer?.id == backendUser?.id}
+             />
          )}
+                     </motion.div>
+                  )}
+
+                  {activeTab === 'episodes' && (
+                     <motion.div
+                        key="episodes"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="space-y-8"
+                     >
+                        <div className="flex justify-between items-center mb-6">
+                           <div>
+                              <h1 className="text-4xl font-bold text-ink mb-2">Show Episodes</h1>
+                              <p className="text-inkLight font-medium">Manage episodes for your series.</p>
+                           </div>
+                           {selectedShowForEpisodes && (
+                              <button 
+                                 onClick={() => setSelectedShowForEpisodes(null)}
+                                 className="flex items-center gap-2 px-4 py-2 bg-surface border border-borderSubtle rounded-xl text-sm font-bold text-ink hover:border-gold transition-all"
+                              >
+                                 <ChevronLeft className="w-4 h-4" />
+                                 Back to Shows
+                              </button>
+                           )}
+                        </div>
+
+                        {!selectedShowForEpisodes ? (
+                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                              {shows.map((show) => (
+                                 <div 
+                                    key={show.id}
+                                    onClick={() => setSelectedShowForEpisodes(show)}
+                                    className="bg-surface border border-borderSubtle rounded-3xl p-6 hover:border-gold cursor-pointer transition-all group shadow-sm hover:shadow-md"
+                                 >
+                                    <div className="aspect-video rounded-2xl bg-canvas overflow-hidden mb-4 relative">
+                                       {show.thumbnail ? (
+                                          <img src={show.thumbnail} alt={show.title} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                                       ) : (
+                                          <div className="w-full h-full flex items-center justify-center text-inkLight opacity-20">
+                                             <Film className="w-12 h-12" />
+                                          </div>
+                                       )}
+                                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+                                          <span className="text-white text-xs font-bold uppercase tracking-widest">Manage Episodes</span>
+                                       </div>
+                                    </div>
+                                    <h3 className="text-xl font-bold text-ink group-hover:text-gold transition-colors truncate">{show.title}</h3>
+                                    <div className="flex items-center gap-3 mt-2 text-xs font-bold text-inkLight uppercase tracking-tighter">
+                                       <span>{show.episode_count || 0} Episodes</span>
+                                       <span className="w-1 h-1 rounded-full bg-inkLight/20" />
+                                       <span>{show.status}</span>
+                                    </div>
+                                 </div>
+                              ))}
+                              {shows.length === 0 && (
+                                 <div className="col-span-full py-20 text-center bg-surface border border-dashed border-borderSubtle rounded-3xl">
+                                    <Film className="w-16 h-16 mx-auto mb-4 text-inkLight/20" />
+                                    <h3 className="text-xl font-bold text-ink mb-2">No shows found</h3>
+                                    <p className="text-inkLight">Create a show first to start managing episodes.</p>
+                                    <button 
+                                       onClick={() => setActiveTab('studio')}
+                                       className="mt-6 px-6 py-3 bg-gold text-canvas rounded-xl font-bold hover:shadow-lg transition-all"
+                                    >
+                                       Create Show
+                                    </button>
+                                 </div>
+                              )}
+                           </div>
+                        ) : (
+                           <div className="bg-canvas border border-borderSubtle rounded-3xl p-8 shadow-soft">
+                              <EpisodeManager 
+                                 showId={selectedShowForEpisodes.id as number} 
+                                 isOwner={selectedShowForEpisodes.creator.id == backendUser.id}
+                              />
+                           </div>
+                        )}
+                     </motion.div>
+                  )}
+
+                  {activeTab === 'live' && (
+                     <motion.div
+                        key="live"
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                     >
+                        <PlayoutControl onNavigate={onNavigate} />
+                     </motion.div>
+                  )}
+
+                  {activeTab === 'merch' && (
+                     <motion.div
+                        key="merch"
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                     >
+                        <MerchTracker />
+                     </motion.div>
+                  )}
+
+                  {activeTab === 'community' && (
+                     <motion.div
+                        key="community"
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                     >
+                        <CommunityPosts />
+                     </motion.div>
+                  )}
+
+                  {activeTab === 'settings' && (
+                     <motion.div
+                        key="settings"
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        className="text-center py-20 grayscale opacity-40"
+                     >
+                        <Settings className="w-16 h-16 mx-auto mb-4" />
+                        <h3 className="text-2xl font-bold">Preferences coming soon</h3>
+                     </motion.div>
+                  )}
+
+                  {activeTab === 'messages' && (
+                     <motion.div
+                        key="messages"
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        className="mt-2"
+                     >
+                        <MessagingInbox isCreatorView={true} />
+                     </motion.div>
+                  )}
+               </AnimatePresence>
+            </div>
+         </div>
 
          {/* Followers/Following Modal */}
          {showFollowersModal && profile && (

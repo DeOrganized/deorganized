@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Calendar, Filter, Heart, Bell, Radio } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { searchShows, Show, fetchTags, Tag } from '../lib/api';
+import { searchShows, Show, fetchTags, Tag, getImageUrl } from '../lib/api';
 import { SearchBar } from './SearchBar';
 
 
@@ -94,7 +94,7 @@ export const ShowsDiscovery: React.FC<ShowsDiscoveryProps> = ({ onNavigate }) =>
 
                         <div className="flex items-center gap-4">
                            <div className="flex items-center gap-3">
-                              <img src={featuredShow.creator.profile_picture || "https://picsum.photos/100/100"} alt="Host" className="w-10 h-10 rounded-full border-2 border-borderSubtle shadow-sm" />
+                              <img src={getImageUrl(featuredShow.creator.profile_picture) || "https://picsum.photos/100/100"} alt="Host" className="w-10 h-10 rounded-full border-2 border-borderSubtle shadow-sm" />
                               <div className="text-sm">
                                  <p className="text-inkLight">Hosted by</p>
                                  <p className="font-bold text-ink">{featuredShow.creator.username}</p>
@@ -249,7 +249,7 @@ export const ShowsDiscovery: React.FC<ShowsDiscoveryProps> = ({ onNavigate }) =>
                         <div className="border-t border-borderSubtle pt-4 mt-auto">
                            <div className="flex items-center justify-between mb-4">
                               <div className="flex items-center gap-2">
-                                 <img src={show.creator.profile_picture || "https://picsum.photos/100/100"} className="w-8 h-8 rounded-full border border-borderSubtle" />
+                                 <img src={getImageUrl(show.creator.profile_picture) || "https://picsum.photos/100/100"} className="w-8 h-8 rounded-full border border-borderSubtle" />
                                  <span className="text-sm font-semibold text-ink">{show.creator.username}</span>
                               </div>
                            </div>
