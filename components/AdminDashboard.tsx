@@ -413,8 +413,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
             {/* Main Content Area */}
             <div className="flex-1 overflow-y-auto pt-24 md:pt-28 p-6 md:p-12 custom-scrollbar">
                 <div className="max-w-6xl mx-auto space-y-8">
-                    {/* Header Section */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                    {/* Header Section — hidden for tabs that render their own header */}
+                    <div className={`flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 ${
+                        activeTab === 'agent-controller' || activeTab === 'news-production' ? 'hidden' : ''
+                    }`}>
                         <div>
                             <h1 className="text-3xl md:text-4xl font-black text-ink">
                                 {sidebarItems.find(i => i.id === activeTab)?.label || 'Dashboard'}
