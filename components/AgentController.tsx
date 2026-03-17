@@ -29,7 +29,7 @@ export const AgentController: React.FC = () => {
     const [copiedArticle, setCopiedArticle] = useState(false);
     const [copiedThread, setCopiedThread] = useState(false);
     const [copiedTweetIndex, setCopiedTweetIndex] = useState<number | null>(null);
-    const chatEndRef = useRef<HTMLDivElement>(null);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
     const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const refreshElioWallet = async () => {
@@ -82,7 +82,8 @@ export const AgentController: React.FC = () => {
     }, [accessToken]);
 
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        const el = chatContainerRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
     }, [chatMessages]);
 
     const handleChat = async () => {
@@ -291,7 +292,7 @@ export const AgentController: React.FC = () => {
                 </div>
 
                 {/* Message area */}
-                <div className="h-80 overflow-y-auto bg-surface rounded-2xl p-4 space-y-3 mb-4">
+                <div ref={chatContainerRef} className="h-80 overflow-y-auto bg-surface rounded-2xl p-4 space-y-3 mb-4">
                     {chatMessages.length === 0 && (
                         <p className="text-sm text-inkLight text-center py-8">
                             Send a message to start chatting with Long Elio.
@@ -328,7 +329,6 @@ export const AgentController: React.FC = () => {
                             </div>
                         </div>
                     )}
-                    <div ref={chatEndRef} />
                 </div>
 
                 {/* Input bar */}
