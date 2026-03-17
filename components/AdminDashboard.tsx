@@ -415,7 +415,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                 <div className="max-w-6xl mx-auto space-y-8">
                     {/* Header Section — hidden for tabs that render their own header */}
                     <div className={`flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 ${
-                        activeTab === 'agent-controller' || activeTab === 'news-production' ? 'hidden' : ''
+                        activeTab === 'playout' || activeTab === 'agent-controller' || activeTab === 'news-production' ? 'hidden' : ''
                     }`}>
                         <div>
                             <h1 className="text-3xl md:text-4xl font-black text-ink">
@@ -631,10 +631,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                 className="min-h-[600px]"
                             >
                                 <div className="bg-canvas border border-borderSubtle rounded-[2rem] p-4 md:p-8 shadow-soft overflow-hidden">
-                                     {/* We strip the outer container padding of PlayoutControl for better integration */}
-                                     <div className="-mt-20">
-                                        <PlayoutControl onNavigate={onNavigate} adminView={true} />
-                                     </div>
+                                    <PlayoutControl onNavigate={onNavigate} adminView={true} />
                                 </div>
                             </motion.div>
                         )}
