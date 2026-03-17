@@ -24,12 +24,22 @@ export const AgentController: React.FC = () => {
     const [chatInput, setChatInput] = useState('');
     const [chatLoading, setChatLoading] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [isRefreshingElio, setIsRefreshingElio] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [copiedArticle, setCopiedArticle] = useState(false);
     const [copiedThread, setCopiedThread] = useState(false);
     const [copiedTweetIndex, setCopiedTweetIndex] = useState<number | null>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
     const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    const refreshElioWallet = async () => {
+        if (!accessToken || isRefreshingElio) return;
+        setIsRefreshingElio(true);
+        try {
+            await getElioWallet(accessToken).then(setElioWallet);
+        } catch (e) {}
+        finally { setIsRefreshingElio(false); }
+    };
 
     const fetchVitals = async () => {
         if (!accessToken) return;
@@ -134,6 +144,14 @@ export const AgentController: React.FC = () => {
                             <Bot className="w-5 h-5 text-gold" />
                         </div>
                         <h2 className="text-lg font-bold text-ink">Long Elio</h2>
+                        <button
+                            onClick={refreshElioWallet}
+                            disabled={isRefreshingElio}
+                            className="ml-auto text-inkLight hover:text-gold transition-colors disabled:opacity-50"
+                            aria-label="Refresh Elio wallet"
+                        >
+                            <RefreshCw className={`w-4 h-4 ${isRefreshingElio ? 'animate-spin text-gold' : ''}`} />
+                        </button>
                     </div>
 
                     {!elioWallet ? (
