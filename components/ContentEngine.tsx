@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     Wallet, Zap, FileText, MessageSquare, Image, Clock,
-    Loader2, Copy, Check, Radio, ChevronDown, ChevronUp
+    Loader2, Copy, Check, Radio, ChevronDown, ChevronUp, Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { request } from '@stacks/connect';
 import { useAuth } from '../lib/AuthContext';
 import {
     getDAPStatus, registerDAP, getDAPBalance, getDAPTransactions,
@@ -38,6 +39,12 @@ export const ContentEngine: React.FC = () => {
     const [latestContent, setLatestContent] = useState<ContentPackage | null>(null);
     const [contentHistory, setContentHistory] = useState<ContentHistoryItem[]>([]);
     const [activeContentTab, setActiveContentTab] = useState<'article' | 'thread' | 'thumbnail'>('article');
+
+    // Buy credits state
+    const [buyCreditsOpen, setBuyCreditsOpen] = useState(false);
+    const [stxAmount, setStxAmount] = useState('1');
+    const [depositPending, setDepositPending] = useState(false);
+    const [advancedOpen, setAdvancedOpen] = useState(false);
 
     // UI state
     const [loading, setLoading] = useState(true);
@@ -150,6 +157,24 @@ export const ContentEngine: React.FC = () => {
         setTimeout(() => setter(false), 2000);
     };
 
+    const handleBuyCredits = async () => {
+        if (!dapStatus || !userInfo) return;
+        const stx = parseFloat(stxAmount);
+        if (!stx || stx <= 0) return;
+        const microStx = String(Math.round(stx * 1_000_000));
+        try {
+            await request('stx_transferStx', {
+                recipient: dapStatus.deposit_address,
+                amount: microStx,
+                memo: userInfo.memo_code,
+            });
+            setDepositPending(true);
+            setBuyCreditsOpen(false);
+        } catch {
+            // user cancelled or wallet rejected — do nothing
+        }
+    };
+
     const balance = parseFloat(userBalance?.balance || '0');
     const cost = PACKAGE_COSTS[serviceType];
     const canGenerate = isRegistered && !isGenerating && balance >= cost;
@@ -232,30 +257,105 @@ export const ContentEngine: React.FC = () => {
                             </button>
                         </div>
 
-                        {/* Deposit Info */}
+                        {/* Buy Credits */}
                         {dapStatus && userInfo && (
-                            <div className="bg-surface rounded-2xl p-5 space-y-3">
-                                <p className="text-xs font-bold text-inkLight uppercase tracking-widest">Deposit STX to Buy Credits</p>
-                                <p className="text-xs text-inkLight">Rate: <span className="text-ink font-bold">{dapStatus.credit_rate} credits / STX</span></p>
+                            <div className="bg-surface rounded-2xl p-5 space-y-4">
+                                <p className="text-xs font-bold text-inkLight uppercase tracking-widest">Buy Credits</p>
 
-                                <div>
-                                    <p className="text-xs text-inkLight mb-1">Deposit Address</p>
-                                    <div className="flex items-center gap-2 bg-canvas border border-borderSubtle rounded-xl px-3 py-2">
-                                        <span className="text-xs font-mono text-ink flex-1 truncate">{dapStatus.deposit_address}</span>
-                                        <button onClick={() => copyToClipboard(dapStatus.deposit_address, setCopiedAddress)}>
-                                            {copiedAddress ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-inkLight hover:text-gold transition-colors" />}
-                                        </button>
+                                {depositPending ? (
+                                    <div className="flex items-start gap-3 bg-gold/10 border border-gold/30 rounded-xl px-4 py-3">
+                                        <Clock className="w-4 h-4 text-gold shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-sm font-bold text-ink">Deposit pending</p>
+                                            <p className="text-xs text-inkLight mt-0.5">Credits will appear within ~1 minute once the DAP watcher picks up your transaction.</p>
+                                            <button
+                                                onClick={() => { setDepositPending(false); userInfo && refreshBalance(userInfo.stacks_address); }}
+                                                className="mt-2 text-xs font-bold text-gold hover:underline"
+                                            >
+                                                Refresh balance
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                ) : buyCreditsOpen ? (
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-xs text-inkLight mb-1 block">STX amount</label>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="number"
+                                                    min="0.000001"
+                                                    step="1"
+                                                    value={stxAmount}
+                                                    onChange={e => setStxAmount(e.target.value)}
+                                                    className="flex-1 bg-canvas border border-borderSubtle rounded-xl px-3 py-2 text-sm font-bold text-ink focus:outline-none focus:border-gold/60"
+                                                />
+                                                <span className="text-xs font-bold text-inkLight shrink-0">STX</span>
+                                            </div>
+                                            <p className="text-xs text-inkLight mt-1.5">
+                                                = <span className="font-bold text-gold">
+                                                    {Math.round((parseFloat(stxAmount) || 0) * dapStatus.credit_rate).toLocaleString()} credits
+                                                </span>
+                                                <span className="ml-2 text-inkLight/60">({dapStatus.credit_rate} credits / STX)</span>
+                                            </p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleBuyCredits}
+                                                disabled={!parseFloat(stxAmount) || parseFloat(stxAmount) <= 0}
+                                                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gold-gradient text-white text-sm font-bold rounded-xl shadow-md shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
+                                            >
+                                                <Zap className="w-4 h-4" />
+                                                Buy with Wallet
+                                            </button>
+                                            <button
+                                                onClick={() => setBuyCreditsOpen(false)}
+                                                className="px-4 py-2.5 text-sm font-bold text-inkLight hover:text-ink border border-borderSubtle rounded-xl transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setBuyCreditsOpen(true)}
+                                        className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gold/40 rounded-xl text-sm font-bold text-gold hover:border-gold hover:bg-gold/5 transition-all"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        Buy Credits
+                                    </button>
+                                )}
 
-                                <div>
-                                    <p className="text-xs text-inkLight mb-1">Your Memo Code <span className="text-red-500">(required)</span></p>
-                                    <div className="flex items-center gap-2 bg-canvas border border-borderSubtle rounded-xl px-3 py-2">
-                                        <span className="text-xs font-mono font-bold text-gold flex-1">{userInfo.memo_code}</span>
-                                        <button onClick={() => copyToClipboard(userInfo.memo_code, setCopiedMemo)}>
-                                            {copiedMemo ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-inkLight hover:text-gold transition-colors" />}
-                                        </button>
-                                    </div>
+                                {/* Advanced: deposit from external wallet */}
+                                <div className="border-t border-borderSubtle pt-3">
+                                    <button
+                                        onClick={() => setAdvancedOpen(v => !v)}
+                                        className="flex items-center gap-1.5 text-xs text-inkLight hover:text-ink transition-colors"
+                                    >
+                                        {advancedOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                        Advanced: deposit from external wallet
+                                    </button>
+                                    {advancedOpen && (
+                                        <div className="mt-3 space-y-2">
+                                            <div>
+                                                <p className="text-xs text-inkLight mb-1">Deposit Address</p>
+                                                <div className="flex items-center gap-2 bg-canvas border border-borderSubtle rounded-xl px-3 py-2">
+                                                    <span className="text-xs font-mono text-ink flex-1 truncate">{dapStatus.deposit_address}</span>
+                                                    <button onClick={() => copyToClipboard(dapStatus.deposit_address, setCopiedAddress)}>
+                                                        {copiedAddress ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-inkLight hover:text-gold transition-colors" />}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-inkLight mb-1">Your Memo Code <span className="text-red-500">(required)</span></p>
+                                                <div className="flex items-center gap-2 bg-canvas border border-borderSubtle rounded-xl px-3 py-2">
+                                                    <span className="text-xs font-mono font-bold text-gold flex-1">{userInfo.memo_code}</span>
+                                                    <button onClick={() => copyToClipboard(userInfo.memo_code, setCopiedMemo)}>
+                                                        {copiedMemo ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-inkLight hover:text-gold transition-colors" />}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
