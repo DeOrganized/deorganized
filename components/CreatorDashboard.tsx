@@ -51,10 +51,38 @@ interface CreatorDashboardProps {
 
 type CreatorTab = 'studio' | 'live' | 'episodes' | 'merch' | 'community' | 'messages' | 'settings' | 'content-engine';
 
+const VALID_TABS: CreatorTab[] = ['studio', 'live', 'episodes', 'merch', 'community', 'messages', 'settings', 'content-engine'];
+
+function getTabFromUrl(): CreatorTab {
+   const seg = window.location.pathname.split('/')[2];
+   return VALID_TABS.includes(seg as CreatorTab) ? (seg as CreatorTab) : 'studio';
+}
+
 export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }) => {
    const { backendUser, accessToken, logout } = useAuth();
    const toast = useToast();
-   const [activeTab, setActiveTab] = useState<CreatorTab>('studio');
+   const [activeTab, setActiveTab] = useState<CreatorTab>(getTabFromUrl);
+
+   const navigateToTab = (tab: CreatorTab) => {
+      setActiveTab(tab);
+      window.history.pushState({}, '', `/dashboard/${tab}`);
+   };
+
+   // Normalize URL on mount (/dashboard → /dashboard/studio)
+   useEffect(() => {
+      const seg = window.location.pathname.split('/')[2];
+      if (!VALID_TABS.includes(seg as CreatorTab)) {
+         window.history.replaceState({}, '', `/dashboard/${activeTab}`);
+      }
+   }, []);
+
+   // Sync tab when user navigates back/forward within /dashboard/*
+   useEffect(() => {
+      const onPopState = () => setActiveTab(getTabFromUrl());
+      window.addEventListener('popstate', onPopState);
+      return () => window.removeEventListener('popstate', onPopState);
+   }, []);
+
    const [showSuccessToast, setShowSuccessToast] = useState(false);
    const [toastMessage, setToastMessage] = useState('');
    const [toastType, setToastType] = useState<'success' | 'error'>('success');
@@ -453,56 +481,56 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
 
             <nav className="space-y-1.5 flex-1">
                <button
-                  onClick={() => setActiveTab('studio')}
+                  onClick={() => navigateToTab('studio')}
                   className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'studio' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
                >
                   <BarChart3 className={`w-5 h-5 ${activeTab === 'studio' ? 'text-background' : ''}`} />
                   Studio
                </button>
                <button
-                  onClick={() => setActiveTab('live')}
+                  onClick={() => navigateToTab('live')}
                   className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'live' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
                >
                   <Radio className={`w-5 h-5 ${activeTab === 'live' ? 'text-background' : ''}`} />
                   Live Controls
                </button>
                <button
-                  onClick={() => setActiveTab('episodes')}
+                  onClick={() => navigateToTab('episodes')}
                   className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'episodes' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
                >
                   <Film className={`w-5 h-5 ${activeTab === 'episodes' ? 'text-background' : ''}`} />
                   Show Episodes
                </button>
                <button
-                  onClick={() => setActiveTab('merch')}
+                  onClick={() => navigateToTab('merch')}
                   className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'merch' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
                >
                   <DollarSign className={`w-5 h-5 ${activeTab === 'merch' ? 'text-background' : ''}`} />
                   Merch Hub
                </button>
                <button
-                  onClick={() => setActiveTab('community')}
+                  onClick={() => navigateToTab('community')}
                   className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'community' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
                >
                   <Users className={`w-5 h-5 ${activeTab === 'community' ? 'text-background' : ''}`} />
                   Community
                </button>
                <button
-                  onClick={() => setActiveTab('messages')}
+                  onClick={() => navigateToTab('messages')}
                   className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'messages' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
                >
                   <MessageSquare className={`w-5 h-5 ${activeTab === 'messages' ? 'text-background' : ''}`} />
                   Messages
                </button>
                <button
-                  onClick={() => setActiveTab('content-engine')}
+                  onClick={() => navigateToTab('content-engine')}
                   className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'content-engine' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
                >
                   <Zap className={`w-5 h-5 ${activeTab === 'content-engine' ? 'text-background' : ''}`} />
                   Content Engine
                </button>
                <button
-                  onClick={() => setActiveTab('settings')}
+                  onClick={() => navigateToTab('settings')}
                   className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'settings' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
                >
                   <Settings className={`w-5 h-5 ${activeTab === 'settings' ? 'text-background' : ''}`} />
@@ -533,7 +561,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                ]).map(({ key, icon: Icon, label }) => (
                   <button
                      key={key}
-                     onClick={() => setActiveTab(key)}
+                     onClick={() => navigateToTab(key)}
                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
                         activeTab === key
                            ? 'bg-gold text-background shadow-md'
@@ -1775,7 +1803,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                                     <h3 className="text-xl font-bold text-ink mb-2">No shows found</h3>
                                     <p className="text-inkLight">Create a show first to start managing episodes.</p>
                                     <button 
-                                       onClick={() => setActiveTab('studio')}
+                                       onClick={() => navigateToTab('studio')}
                                        className="mt-6 px-6 py-3 bg-gold text-canvas rounded-xl font-bold hover:shadow-lg transition-all"
                                     >
                                        Create Show

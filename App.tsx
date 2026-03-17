@@ -39,7 +39,7 @@ function parseUrl(pathname: string): { page: PageView; id: string | number | nul
     case 'events':
       return param ? { page: 'event-detail', id: param } : { page: 'event-calendar', id: null };
     case 'dashboard':
-      return { page: 'dashboard', id: null };
+      return { page: 'dashboard', id: param }; // param holds the tab name if present
     case 'profile':
       return { page: 'user-profile', id: null };
     case 'edit-profile':
@@ -66,7 +66,7 @@ function pageToUrl(page: PageView, id?: string | number | null): string {
     case 'creator-detail': return `/creators/${id}`;
     case 'event-calendar': return '/events';
     case 'event-detail': return `/events/${id}`;
-    case 'dashboard': return '/dashboard';
+    case 'dashboard': return id ? `/dashboard/${id}` : '/dashboard';
     case 'user-profile': return '/profile';
     case 'edit-profile': return '/edit-profile';
     case 'admin': return '/admin';
