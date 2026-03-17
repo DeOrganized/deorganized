@@ -13,6 +13,7 @@ export const NewsProductionStudio: React.FC = () => {
 
     const [runType, setRunType] = useState<'news' | 'stacks'>('news');
     const [operatorPrompt, setOperatorPrompt] = useState('');
+    const [additionalLinks, setAdditionalLinks] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [generationError, setGenerationError] = useState<string | null>(null);
     const [latestContent, setLatestContent] = useState<ContentPackage | null>(null);
@@ -56,7 +57,16 @@ export const NewsProductionStudio: React.FC = () => {
         setIsGenerating(true);
         setGenerationError(null);
         try {
-            await triggerNewsGeneration(accessToken, runType, operatorPrompt || undefined);
+            const parsedLinks = additionalLinks
+                .split('\n')
+                .map(l => l.trim())
+                .filter(Boolean);
+            await triggerNewsGeneration(
+                accessToken,
+                runType,
+                operatorPrompt || undefined,
+                parsedLinks.length ? parsedLinks : undefined,
+            );
         } catch (e: any) {
             setGenerationError(e.message);
             setIsGenerating(false);
@@ -165,6 +175,21 @@ export const NewsProductionStudio: React.FC = () => {
                         onChange={e => setOperatorPrompt(e.target.value)}
                         placeholder="Optional editorial direction — e.g. 'Focus on DeFi developments and sBTC adoption'"
                         className="w-full bg-surface border border-borderSubtle rounded-2xl px-4 py-3 text-sm font-medium text-ink placeholder:text-inkLight focus:outline-none focus:border-gold/60 transition-colors resize-none"
+                        disabled={isGenerating}
+                    />
+                </div>
+
+                {/* Additional links */}
+                <div className="mb-5">
+                    <label className="text-xs font-bold text-inkLight uppercase tracking-widest mb-2 block">
+                        Additional Links <span className="normal-case font-medium">(one per line, optional)</span>
+                    </label>
+                    <textarea
+                        rows={3}
+                        value={additionalLinks}
+                        onChange={e => setAdditionalLinks(e.target.value)}
+                        placeholder={"https://example.com/article\nhttps://example.com/another"}
+                        className="w-full bg-surface border border-borderSubtle rounded-2xl px-4 py-3 text-sm font-medium text-ink placeholder:text-inkLight font-mono focus:outline-none focus:border-gold/60 transition-colors resize-none"
                         disabled={isGenerating}
                     />
                 </div>

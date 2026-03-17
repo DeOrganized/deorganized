@@ -2730,7 +2730,8 @@ export const getSocialAgentTransactions = async (token: string): Promise<DAPTran
 export const triggerNewsGeneration = async (
     token: string,
     runType: 'news' | 'stacks',
-    operatorPrompt?: string
+    operatorPrompt?: string,
+    additionalLinks?: string[]
 ): Promise<{ running: boolean }> => {
     const endpoint = runType === 'stacks'
         ? `${API_BASE_URL}/content/generate-stacks/`
@@ -2741,7 +2742,7 @@ export const triggerNewsGeneration = async (
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ operatorPrompt }),
+        body: JSON.stringify({ operatorPrompt, additionalLinks }),
     });
     if (!res.ok) throw new Error('Failed to trigger generation');
     return res.json();
