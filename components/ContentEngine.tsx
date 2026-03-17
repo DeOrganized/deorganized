@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     Wallet, Zap, FileText, MessageSquare, Image, Clock,
-    Loader2, Copy, Check, Radio, ChevronDown, ChevronUp, Plus, RefreshCw
+    Loader2, Copy, Check, Radio, ChevronDown, ChevronUp, Plus, RefreshCw, Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { request } from '@stacks/connect';
@@ -41,6 +41,10 @@ export const ContentEngine: React.FC = () => {
     const [activeContentTab, setActiveContentTab] = useState<'article' | 'thread' | 'thumbnail'>('article');
 
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [copiedArticle, setCopiedArticle] = useState(false);
+    const [copiedThread, setCopiedThread] = useState(false);
+    const [copiedThumbnailUrl, setCopiedThumbnailUrl] = useState(false);
+    const [copiedTweetIndex, setCopiedTweetIndex] = useState<number | null>(null);
 
     // Buy credits state
     const [buyCreditsOpen, setBuyCreditsOpen] = useState(false);
@@ -177,6 +181,26 @@ export const ContentEngine: React.FC = () => {
             setBuyCreditsOpen(false);
         } catch {
             // user cancelled or wallet rejected — do nothing
+        }
+    };
+
+    const copyTweet = (text: string, index: number) => {
+        navigator.clipboard.writeText(text);
+        setCopiedTweetIndex(index);
+        setTimeout(() => setCopiedTweetIndex(null), 2000);
+    };
+
+    const handleDownloadThumbnail = async (url: string, date: string) => {
+        try {
+            const res = await fetch(url);
+            const blob = await res.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `thumbnail-${date}.jpg`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        } catch {
+            window.open(url, '_blank');
         }
     };
 
@@ -499,11 +523,20 @@ export const ContentEngine: React.FC = () => {
                                 transition={{ duration: 0.15 }}
                                 className="bg-surface rounded-2xl p-6"
                             >
-                                {latestContent.narrativeAngle && (
-                                    <p className="text-xs font-bold text-gold uppercase tracking-widest mb-4">
-                                        Angle: {latestContent.narrativeAngle}
-                                    </p>
-                                )}
+                                <div className="flex items-start justify-between gap-4 mb-4">
+                                    {latestContent.narrativeAngle ? (
+                                        <p className="text-xs font-bold text-gold uppercase tracking-widest">
+                                            Angle: {latestContent.narrativeAngle}
+                                        </p>
+                                    ) : <span />}
+                                    <button
+                                        onClick={() => copyToClipboard(latestContent.articleText, setCopiedArticle)}
+                                        className="flex items-center gap-1.5 text-xs font-bold text-inkLight hover:text-gold transition-colors shrink-0"
+                                    >
+                                        {copiedArticle ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                        {copiedArticle ? 'Copied!' : 'Copy Article'}
+                                    </button>
+                                </div>
                                 <div className="text-sm text-ink leading-relaxed whitespace-pre-wrap font-medium">
                                     {latestContent.articleText}
                                 </div>
@@ -519,19 +552,40 @@ export const ContentEngine: React.FC = () => {
                                 transition={{ duration: 0.15 }}
                                 className="space-y-3"
                             >
+                                <div className="flex justify-end mb-1">
+                                    <button
+                                        onClick={() => copyToClipboard(latestContent.threadText, setCopiedThread)}
+                                        className="flex items-center gap-1.5 text-xs font-bold text-inkLight hover:text-gold transition-colors"
+                                    >
+                                        {copiedThread ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                        {copiedThread ? 'Copied!' : 'Copy Thread'}
+                                    </button>
+                                </div>
                                 {latestContent.threadText
                                     .split(/\n(?=\d+\/)/)
                                     .filter(t => t.trim())
-                                    .map((tweet, i) => (
-                                        <div key={i} className="bg-surface rounded-2xl p-4 border border-borderSubtle">
-                                            <div className="flex items-start gap-3">
-                                                <span className="w-6 h-6 rounded-full bg-gold/10 text-gold text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
-                                                    {i + 1}
-                                                </span>
-                                                <p className="text-sm text-ink leading-relaxed">{tweet.replace(/^\d+\/\n?/, '').trim()}</p>
+                                    .map((tweet, i) => {
+                                        const tweetText = tweet.replace(/^\d+\/\n?/, '').trim();
+                                        return (
+                                            <div key={i} className="bg-surface rounded-2xl p-4 border border-borderSubtle">
+                                                <div className="flex items-start gap-3">
+                                                    <span className="w-6 h-6 rounded-full bg-gold/10 text-gold text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                                                        {i + 1}
+                                                    </span>
+                                                    <p className="text-sm text-ink leading-relaxed flex-1">{tweetText}</p>
+                                                    <button
+                                                        onClick={() => copyTweet(tweetText, i)}
+                                                        className="text-inkLight hover:text-gold transition-colors shrink-0 mt-0.5"
+                                                        aria-label="Copy tweet"
+                                                    >
+                                                        {copiedTweetIndex === i
+                                                            ? <Check className="w-3.5 h-3.5 text-green-500" />
+                                                            : <Copy className="w-3.5 h-3.5" />}
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                             </motion.div>
                         )}
 
@@ -542,16 +596,34 @@ export const ContentEngine: React.FC = () => {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
                                 transition={{ duration: 0.15 }}
-                                className="flex justify-center"
+                                className="space-y-4"
                             >
-                                <img
-                                    src={getContentThumbnailUrl(latestContent.date, 'landscape')}
-                                    alt="Generated thumbnail"
-                                    className="rounded-2xl max-w-full shadow-md"
-                                    onError={(e) => {
-                                        (e.target as HTMLImageElement).style.display = 'none';
-                                    }}
-                                />
+                                <div className="flex justify-end gap-3">
+                                    <button
+                                        onClick={() => copyToClipboard(getContentThumbnailUrl(latestContent.date, 'landscape'), setCopiedThumbnailUrl)}
+                                        className="flex items-center gap-1.5 text-xs font-bold text-inkLight hover:text-gold transition-colors"
+                                    >
+                                        {copiedThumbnailUrl ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                        {copiedThumbnailUrl ? 'Copied!' : 'Copy URL'}
+                                    </button>
+                                    <button
+                                        onClick={() => handleDownloadThumbnail(getContentThumbnailUrl(latestContent.date, 'landscape'), latestContent.date)}
+                                        className="flex items-center gap-1.5 text-xs font-bold text-inkLight hover:text-gold transition-colors"
+                                    >
+                                        <Download className="w-3.5 h-3.5" />
+                                        Download
+                                    </button>
+                                </div>
+                                <div className="flex justify-center">
+                                    <img
+                                        src={getContentThumbnailUrl(latestContent.date, 'landscape')}
+                                        alt="Generated thumbnail"
+                                        className="rounded-2xl max-w-full shadow-md"
+                                        onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = 'none';
+                                        }}
+                                    />
+                                </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
