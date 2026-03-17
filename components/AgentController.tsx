@@ -93,7 +93,16 @@ export const AgentController: React.FC = () => {
         setChatLoading(true);
         try {
             const res = await chatWithElio(accessToken, userMsg);
-            setChatMessages(prev => [...prev, { role: 'agent', text: res.response.reply }]);
+            // Defensive extraction — agent may return { response: { reply } } or { reply } directly
+            let replyText: string;
+            try {
+                replyText = res?.response?.reply
+                    ?? (res as any)?.reply
+                    ?? 'Received unexpected response format';
+            } catch {
+                replyText = 'Received unexpected response format';
+            }
+            setChatMessages(prev => [...prev, { role: 'agent', text: replyText }]);
         } catch (e: any) {
             setChatMessages(prev => [...prev, { role: 'agent', text: `Error: ${e.message}` }]);
         } finally {
