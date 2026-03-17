@@ -58,12 +58,9 @@ export const ProfileSetup: React.FC<ProfileSetupProps> = ({ onNavigate }) => {
         try {
             console.log('Submitting setup form:', formData);
 
+            // Navigation is handled by AuthContext.handleCompleteSetup which
+            // redirects to setup_redirect (stored in sessionStorage) or role-based default
             await handleCompleteSetup(formData);
-
-            // Navigate based on role
-            setTimeout(() => {
-                onNavigate(formData.role === 'creator' ? 'dashboard' : 'user-profile');
-            }, 300);
 
         } catch (error: any) {
             console.error('Setup failed:', error);

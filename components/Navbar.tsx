@@ -65,8 +65,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
       walletCheckAttempted.current = walletAddress;
 
       handleWalletConnect(
-        // On new user - navigate to setup (no reload needed, polling handles it)
+        // On new user - save current URL then navigate to setup
         () => {
+          const currentPath = window.location.pathname;
+          if (currentPath && currentPath !== '/register') {
+            sessionStorage.setItem('setup_redirect', currentPath);
+          }
           if (onNavigate) onNavigate('register');
         },
         // On existing user - reload page to show authenticated state

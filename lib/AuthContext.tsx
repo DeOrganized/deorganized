@@ -205,8 +205,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setAccessToken(result.tokens.access);
             setBackendUser(result.user);
 
-            // Auto-refresh to update UI with authenticated state
-            window.location.reload();
+            // Navigate to stored redirect URL, or role-based default
+            const redirect = sessionStorage.getItem('setup_redirect');
+            sessionStorage.removeItem('setup_redirect');
+            const destination = redirect && redirect !== '/register'
+                ? redirect
+                : result.user.role === 'creator' ? '/dashboard' : '/profile';
+            window.location.replace(destination);
         } catch (error: any) {
             console.error('❌ Setup failed:', error);
             setAuthError(error.message || 'Setup failed');
