@@ -5,7 +5,7 @@ import {
     UserPlus, TrendingUp, Shield, CheckCircle, XCircle,
     Search, ChevronLeft, ChevronRight, AlertCircle,
     BarChart3, Eye, Clock, Filter, RefreshCw, Star,
-    ShoppingBag, Send, Zap, Settings, Layout, Globe, Bot
+    ShoppingBag, Send, Zap, Settings, Layout, Globe, Bot, X, ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { API_BASE_URL } from '../lib/api';
@@ -51,6 +51,7 @@ interface AdminUser {
     role: string;
     is_verified: boolean;
     is_staff: boolean;
+    is_active: boolean;
     is_creator: boolean;
     follower_count: number;
     bio?: string;
@@ -119,6 +120,27 @@ async function toggleUserVerification(userId: number): Promise<{ is_verified: bo
         headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error(`Failed to toggle verification: ${res.status}`);
+    return res.json();
+}
+
+async function setUserPermissions(userId: number, perms: {
+    role?: string;
+    is_verified?: boolean;
+    is_staff?: boolean;
+    is_active?: boolean;
+}): Promise<AdminUser> {
+    const token = await getValidAccessToken();
+    if (!token) throw new Error('Not authenticated');
+
+    const res = await fetch(`${API_BASE_URL}/users/${userId}/set-permissions/`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(perms),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Failed: ${res.status}`);
+    }
     return res.json();
 }
 
@@ -205,6 +227,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     const [usersSearch, setUsersSearch] = useState('');
     const [usersRoleFilter, setUsersRoleFilter] = useState('');
     const [usersLoading, setUsersLoading] = useState(false);
+
+    // User permissions modal state
+    const [managingUser, setManagingUser] = useState<AdminUser | null>(null);
+    const [permRole, setPermRole] = useState('');
+    const [permVerified, setPermVerified] = useState(false);
+    const [permStaff, setPermStaff] = useState(false);
+    const [permActive, setPermActive] = useState(true);
+    const [permSaving, setPermSaving] = useState(false);
+
+    const openPermissionsModal = (user: AdminUser) => {
+        setManagingUser(user);
+        setPermRole(user.role);
+        setPermVerified(user.is_verified);
+        setPermStaff(user.is_staff);
+        setPermActive(user.is_active ?? true);
+    };
+
+    const handleSavePermissions = async () => {
+        if (!managingUser) return;
+        setPermSaving(true);
+        try {
+            const updated = await setUserPermissions(managingUser.id, {
+                role: permRole,
+                is_verified: permVerified,
+                is_staff: permStaff,
+                is_active: permActive,
+            });
+            setUsers(prev => prev.map(u => u.id === managingUser.id ? { ...u, ...updated } : u));
+            setManagingUser(null);
+            toast.success(`Permissions updated for ${managingUser.username}`);
+        } catch (e: any) {
+            toast.error(e.message || 'Failed to update permissions');
+        } finally {
+            setPermSaving(false);
+        }
+    };
 
     // Feedback tab state
     const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
@@ -561,7 +619,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                                 <tr
                                                     key={user.id}
                                                     className="hover:bg-surface/30 transition-colors cursor-pointer"
-                                                    onClick={() => onNavigate('creator-detail', user.username)}
+                                                    onClick={() => openPermissionsModal(user)}
                                                 >
                                                     <td className="px-8 py-5">
                                                         <div className="flex items-center gap-3">
@@ -673,6 +731,101 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                     </AnimatePresence>
                 </div>
             </div>
+
+            {/* User Permissions Modal */}
+            <AnimatePresence>
+                {managingUser && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setManagingUser(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-canvas border border-borderSubtle rounded-3xl shadow-2xl w-full max-w-md p-8"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            {/* Header */}
+                            <div className="flex items-start justify-between mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-xl bg-surface border border-borderSubtle flex items-center justify-center font-bold text-lg">
+                                        {managingUser.username[0].toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <p className="font-black text-ink text-lg">{managingUser.username}</p>
+                                        <p className="text-xs text-inkLight">Joined {new Date(managingUser.date_joined).toLocaleDateString()}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => { setManagingUser(null); onNavigate('creator-detail', managingUser.username); }}
+                                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-inkLight hover:text-ink border border-borderSubtle rounded-xl transition-colors"
+                                    >
+                                        <ExternalLink className="w-3 h-3" /> Profile
+                                    </button>
+                                    <button onClick={() => setManagingUser(null)} className="p-1.5 hover:bg-surface rounded-lg transition-colors">
+                                        <X className="w-4 h-4 text-inkLight" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Controls */}
+                            <div className="space-y-5">
+                                {/* Role */}
+                                <div>
+                                    <label className="block text-xs font-black text-inkLight uppercase tracking-widest mb-2">Role</label>
+                                    <div className="flex gap-2">
+                                        {['user', 'creator'].map(r => (
+                                            <button
+                                                key={r}
+                                                onClick={() => setPermRole(r)}
+                                                className={`flex-1 py-2.5 rounded-xl text-sm font-bold capitalize transition-all border ${
+                                                    permRole === r
+                                                        ? 'bg-gold text-canvas border-gold'
+                                                        : 'bg-surface border-borderSubtle text-inkLight hover:text-ink'
+                                                }`}
+                                            >{r}</button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Toggles */}
+                                {([
+                                    { label: 'Verified', key: 'verified', value: permVerified, set: setPermVerified, desc: 'Shows verified badge on profile' },
+                                    { label: 'Staff Access', key: 'staff', value: permStaff, set: setPermStaff, desc: 'Grants admin panel access' },
+                                    { label: 'Account Active', key: 'active', value: permActive, set: setPermActive, desc: 'Inactive users cannot log in' },
+                                ] as const).map(({ label, key, value, set, desc }) => (
+                                    <div key={key} className="flex items-center justify-between py-3 border-b border-borderSubtle/50 last:border-0">
+                                        <div>
+                                            <p className="font-bold text-ink text-sm">{label}</p>
+                                            <p className="text-xs text-inkLight">{desc}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => set(!value)}
+                                            className={`relative w-11 h-6 rounded-full transition-colors ${value ? 'bg-gold' : 'bg-borderSubtle'}`}
+                                        >
+                                            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${value ? 'translate-x-5' : 'translate-x-0'}`} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Save */}
+                            <button
+                                onClick={handleSavePermissions}
+                                disabled={permSaving}
+                                className="mt-6 w-full py-3 bg-gold text-canvas font-black rounded-2xl hover:bg-gold/90 transition-colors disabled:opacity-50"
+                            >
+                                {permSaving ? 'Saving…' : 'Save Permissions'}
+                            </button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
