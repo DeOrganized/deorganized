@@ -2599,3 +2599,31 @@ export const getContentHistory = async (token: string, limit = 10): Promise<Cont
 export const getContentThumbnailUrl = (date: string, format: 'landscape' | 'square' = 'landscape'): string => {
     return `${API_BASE_URL}/content/thumbnail/${date}/${format}/`;
 };
+
+// --- Stacks Wallet Balances (Hiro API) ---
+
+export interface StacksWalletBalances {
+    stx: string;       // formatted STX (e.g. "12.50")
+    sbtc: string;      // formatted sBTC (e.g. "0.00012345")
+    usdcx: string;     // formatted USDCx (e.g. "100.00")
+}
+
+const HIRO_API = 'https://api.hiro.so';
+const SBTC_KEY  = 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token::sbtc-token';
+const USDCX_KEY = 'SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE.usdcx::usdcx';
+
+export const getStacksWalletBalances = async (address: string): Promise<StacksWalletBalances> => {
+    const res = await fetch(`${HIRO_API}/v1/address/${address}/balances`);
+    if (!res.ok) throw new Error('Failed to fetch Stacks balances');
+    const data = await res.json();
+
+    const stxRaw   = BigInt(data?.stx?.balance ?? '0');
+    const sbtcRaw  = BigInt(data?.fungible_tokens?.[SBTC_KEY]?.balance  ?? '0');
+    const usdcxRaw = BigInt(data?.fungible_tokens?.[USDCX_KEY]?.balance ?? '0');
+
+    return {
+        stx:   (Number(stxRaw)   / 1_000_000).toFixed(2),
+        sbtc:  (Number(sbtcRaw)  / 100_000_000).toFixed(8),
+        usdcx: (Number(usdcxRaw) / 1_000_000).toFixed(2),
+    };
+};

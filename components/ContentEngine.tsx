@@ -8,8 +8,9 @@ import { useAuth } from '../lib/AuthContext';
 import {
     getDAPStatus, registerDAP, getDAPBalance, getDAPTransactions,
     generateContent, getContentRunStatus, getLatestContent, getContentHistory,
-    getContentThumbnailUrl,
+    getContentThumbnailUrl, getStacksWalletBalances,
     DAPStatus, DAPUser, DAPBalance, DAPTransaction, ContentPackage, ContentHistoryItem,
+    StacksWalletBalances,
 } from '../lib/api';
 
 const PACKAGE_COSTS = {
@@ -27,6 +28,7 @@ export const ContentEngine: React.FC = () => {
     const [transactions, setTransactions] = useState<DAPTransaction[]>([]);
     const [stacksAddress, setStacksAddress] = useState('');
     const [isRegistered, setIsRegistered] = useState(false);
+    const [walletBalances, setWalletBalances] = useState<StacksWalletBalances | null>(null);
 
     // Generation state
     const [serviceType, setServiceType] = useState<'news-package' | 'stacks-package'>('news-package');
@@ -59,12 +61,14 @@ export const ContentEngine: React.FC = () => {
     const refreshBalance = async (address: string) => {
         if (!accessToken) return;
         try {
-            const [bal, txData] = await Promise.all([
+            const [bal, txData, walletBals] = await Promise.all([
                 getDAPBalance(accessToken, address),
                 getDAPTransactions(accessToken, address),
+                getStacksWalletBalances(address).catch(() => null),
             ]);
             setUserBalance(bal);
             setTransactions(txData.transactions || []);
+            if (walletBals) setWalletBalances(walletBals);
         } catch (e) {
             console.error('Failed to refresh balance:', e);
         }
@@ -225,6 +229,22 @@ export const ContentEngine: React.FC = () => {
                         )}
                     </div>
                 ) : (
+                    <div className="space-y-4">
+                    {/* Stacks Wallet Token Balances */}
+                    {walletBalances && (
+                        <div className="grid grid-cols-3 gap-3">
+                            {([
+                                { label: 'STX',   value: walletBalances.stx,   decimals: 2 },
+                                { label: 'sBTC',  value: walletBalances.sbtc,  decimals: 8 },
+                                { label: 'USDCx', value: walletBalances.usdcx, decimals: 2 },
+                            ] as const).map(({ label, value }) => (
+                                <div key={label} className="bg-surface rounded-2xl p-4 text-center">
+                                    <p className="text-xs font-black text-inkLight uppercase tracking-widest mb-1">{label}</p>
+                                    <p className="text-lg font-black text-ink">{value}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Balance */}
                         <div className="bg-surface rounded-2xl p-5">
@@ -268,6 +288,7 @@ export const ContentEngine: React.FC = () => {
                                 </div>
                             </div>
                         )}
+                    </div>
                     </div>
                 )}
             </section>
