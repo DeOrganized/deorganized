@@ -59,7 +59,7 @@ function getTabFromUrl(): CreatorTab {
 }
 
 export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }) => {
-   const { backendUser, accessToken, logout } = useAuth();
+   const { backendUser, accessToken, logout, connectWallet, refreshUser } = useAuth();
    const toast = useToast();
    const [activeTab, setActiveTab] = useState<CreatorTab>(getTabFromUrl);
 
@@ -98,6 +98,9 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
    // Followers modal
    const [showFollowersModal, setShowFollowersModal] = useState(false);
    const [followersModalTab, setFollowersModalTab] = useState<'followers' | 'following'>('followers');
+
+   const [isUpgrading, setIsUpgrading] = useState(false);
+   const [upgradeError, setUpgradeError] = useState<string | null>(null);
 
    // Loading states
    const [isLoadingProfile, setIsLoadingProfile] = useState(true);
@@ -447,10 +450,71 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
       }
    };
 
-   if (!backendUser || backendUser.role !== 'creator') {
+   if (!backendUser) {
       return (
-         <div className="min-h-screen pt-24 pb-20 container max-w-[1024px] mx-auto px-6 flex items-center justify-center">
-            <p className="text-inkLight">Creator access only. Please log in with a creator account.</p>
+         <div className="min-h-screen pt-24 pb-20 flex items-center justify-center px-6">
+            <div className="bg-canvas rounded-3xl shadow-soft border border-borderSubtle p-10 max-w-md w-full text-center">
+               <div className="w-14 h-14 rounded-2xl bg-gold/10 flex items-center justify-center mx-auto mb-5">
+                  <User className="w-7 h-7 text-gold" />
+               </div>
+               <h2 className="text-2xl font-bold text-ink mb-2">Welcome to the Creator Studio</h2>
+               <p className="text-inkLight text-sm mb-7">Connect your Stacks wallet to get started.</p>
+               <button
+                  onClick={connectWallet}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-gold-gradient text-white font-bold rounded-2xl shadow-lg shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all"
+               >
+                  Connect Wallet
+               </button>
+            </div>
+         </div>
+      );
+   }
+
+   if (backendUser.role !== 'creator') {
+      const handleUpgrade = async () => {
+         if (!accessToken) return;
+         setIsUpgrading(true);
+         setUpgradeError(null);
+         try {
+            const formData = new FormData();
+            formData.append('role', 'creator');
+            await updateUserProfile(backendUser.id, formData, accessToken);
+            await refreshUser();
+         } catch (e: any) {
+            setUpgradeError(e.message || 'Failed to upgrade. Please try again.');
+         } finally {
+            setIsUpgrading(false);
+         }
+      };
+
+      return (
+         <div className="min-h-screen pt-24 pb-20 flex items-center justify-center px-6">
+            <div className="bg-canvas rounded-3xl shadow-soft border border-borderSubtle p-10 max-w-md w-full text-center">
+               <div className="w-14 h-14 rounded-2xl bg-gold/10 flex items-center justify-center mx-auto mb-5">
+                  <Zap className="w-7 h-7 text-gold" />
+               </div>
+               <h2 className="text-2xl font-bold text-ink mb-2">Unlock Creator Tools</h2>
+               <p className="text-inkLight text-sm mb-7">
+                  Upgrade to a free Creator account to access the Content Engine, live scheduling, episode management, and more.
+               </p>
+               {upgradeError && (
+                  <p className="text-sm text-red-500 font-medium mb-4">{upgradeError}</p>
+               )}
+               <button
+                  onClick={handleUpgrade}
+                  disabled={isUpgrading}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-gold-gradient text-white font-bold rounded-2xl shadow-lg shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
+               >
+                  {isUpgrading ? (
+                     <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Upgrading...
+                     </>
+                  ) : (
+                     'Upgrade to Creator — Free'
+                  )}
+               </button>
+            </div>
          </div>
       );
    }
