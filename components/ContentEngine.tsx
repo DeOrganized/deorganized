@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     Wallet, Zap, FileText, MessageSquare, Image, Clock,
-    ArrowRight, Loader2, Copy, Check, Radio, ChevronDown, ChevronUp
+    Loader2, Copy, Check, Radio, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../lib/AuthContext';
@@ -26,7 +26,6 @@ export const ContentEngine: React.FC = () => {
     const [userBalance, setUserBalance] = useState<DAPBalance | null>(null);
     const [userInfo, setUserInfo] = useState<DAPUser | null>(null);
     const [transactions, setTransactions] = useState<DAPTransaction[]>([]);
-    const [stacksAddress, setStacksAddress] = useState('');
     const [isRegistered, setIsRegistered] = useState(false);
     const [walletBalances, setWalletBalances] = useState<StacksWalletBalances | null>(null);
 
@@ -42,8 +41,6 @@ export const ContentEngine: React.FC = () => {
 
     // UI state
     const [loading, setLoading] = useState(true);
-    const [registering, setRegistering] = useState(false);
-    const [registerError, setRegisterError] = useState<string | null>(null);
     const [copiedAddress, setCopiedAddress] = useState(false);
     const [copiedMemo, setCopiedMemo] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(true);
@@ -89,10 +86,9 @@ export const ContentEngine: React.FC = () => {
                 if (content) setLatestContent(content);
                 setContentHistory(history);
 
-                // Check if user is already registered via backendUser stacks_address
-                const addr = (backendUser as any)?.stacks_address;
+                // Auto-register with DAP using the address from the logged-in user
+                const addr = backendUser?.stacks_address;
                 if (addr) {
-                    setStacksAddress(addr);
                     try {
                         const registered = await registerDAP(accessToken, addr);
                         setUserInfo(registered);
@@ -112,22 +108,6 @@ export const ContentEngine: React.FC = () => {
         init();
         return () => stopPolling();
     }, [accessToken]);
-
-    const handleRegister = async () => {
-        if (!accessToken || !stacksAddress.trim()) return;
-        setRegistering(true);
-        setRegisterError(null);
-        try {
-            const user = await registerDAP(accessToken, stacksAddress.trim());
-            setUserInfo(user);
-            setIsRegistered(true);
-            await refreshBalance(stacksAddress.trim());
-        } catch (e: any) {
-            setRegisterError(e.message || 'Registration failed');
-        } finally {
-            setRegistering(false);
-        }
-    };
 
     const handleGenerate = async () => {
         if (!accessToken || !userInfo) return;
@@ -205,28 +185,9 @@ export const ContentEngine: React.FC = () => {
                 </div>
 
                 {!isRegistered ? (
-                    <div className="space-y-4">
-                        <p className="text-sm text-inkLight">Connect your Stacks wallet to access the credit system.</p>
-                        <div className="flex gap-3">
-                            <input
-                                type="text"
-                                value={stacksAddress}
-                                onChange={(e) => setStacksAddress(e.target.value)}
-                                placeholder="SP1234... (your Stacks address)"
-                                className="flex-1 bg-surface border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors"
-                            />
-                            <button
-                                onClick={handleRegister}
-                                disabled={registering || !stacksAddress.trim()}
-                                className="flex items-center gap-2 px-6 py-3 bg-gold-gradient text-white font-bold rounded-xl shadow-lg shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
-                            >
-                                {registering ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                                Connect Wallet
-                            </button>
-                        </div>
-                        {registerError && (
-                            <p className="text-sm text-red-500 font-medium">{registerError}</p>
-                        )}
+                    <div className="flex items-center gap-3 py-4">
+                        <Wallet className="w-5 h-5 text-inkLight shrink-0" />
+                        <p className="text-sm text-inkLight">Log in with your Stacks wallet to access the Content Engine.</p>
                     </div>
                 ) : (
                     <div className="space-y-4">
