@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     Wallet, Zap, FileText, MessageSquare, Image, Clock,
-    Loader2, Copy, Check, Radio, ChevronDown, ChevronUp, Plus
+    Loader2, Copy, Check, Radio, ChevronDown, ChevronUp, Plus, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { request } from '@stacks/connect';
@@ -40,6 +40,8 @@ export const ContentEngine: React.FC = () => {
     const [contentHistory, setContentHistory] = useState<ContentHistoryItem[]>([]);
     const [activeContentTab, setActiveContentTab] = useState<'article' | 'thread' | 'thumbnail'>('article');
 
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
     // Buy credits state
     const [buyCreditsOpen, setBuyCreditsOpen] = useState(false);
     const [stxAmount, setStxAmount] = useState('1');
@@ -64,6 +66,7 @@ export const ContentEngine: React.FC = () => {
 
     const refreshBalance = async (address: string) => {
         if (!accessToken) return;
+        setIsRefreshing(true);
         try {
             const [bal, txData, walletBals] = await Promise.all([
                 getDAPBalance(accessToken, address),
@@ -75,6 +78,8 @@ export const ContentEngine: React.FC = () => {
             if (walletBals) setWalletBalances(walletBals);
         } catch (e) {
             console.error('Failed to refresh balance:', e);
+        } finally {
+            setIsRefreshing(false);
         }
     };
 
@@ -248,13 +253,17 @@ export const ContentEngine: React.FC = () => {
                             <div className="text-5xl font-black text-gold mb-1">
                                 {balance.toLocaleString()}
                             </div>
-                            <p className="text-xs text-inkLight">credits available</p>
-                            <button
-                                onClick={() => userInfo && refreshBalance(userInfo.stacks_address)}
-                                className="mt-3 text-xs font-bold text-inkLight hover:text-gold transition-colors"
-                            >
-                                Refresh balance
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <p className="text-xs text-inkLight">credits available</p>
+                                <button
+                                    onClick={() => userInfo && refreshBalance(userInfo.stacks_address)}
+                                    disabled={isRefreshing}
+                                    className="text-inkLight hover:text-gold transition-colors disabled:cursor-not-allowed"
+                                    aria-label="Refresh balance"
+                                >
+                                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-gold' : ''}`} />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Buy Credits */}
@@ -270,8 +279,10 @@ export const ContentEngine: React.FC = () => {
                                             <p className="text-xs text-inkLight mt-0.5">Credits will appear within ~1 minute once the DAP watcher picks up your transaction.</p>
                                             <button
                                                 onClick={() => { setDepositPending(false); userInfo && refreshBalance(userInfo.stacks_address); }}
-                                                className="mt-2 text-xs font-bold text-gold hover:underline"
+                                                disabled={isRefreshing}
+                                                className="mt-2 flex items-center gap-1.5 text-xs font-bold text-gold hover:underline disabled:opacity-50"
                                             >
+                                                <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
                                                 Refresh balance
                                             </button>
                                         </div>
