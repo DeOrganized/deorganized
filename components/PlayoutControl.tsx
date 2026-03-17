@@ -751,6 +751,20 @@ export const PlayoutControl: React.FC<PlayoutControlProps> = ({ onNavigate, admi
                     </div>
                 </div>
 
+                {/* Live Preview */}
+                <div className="mb-8">
+                    <p className="text-xs font-black text-inkLight uppercase tracking-widest mb-3">Live Preview</p>
+                    <div className="rounded-2xl overflow-hidden border border-borderSubtle">
+                        <iframe
+                            src="https://player.restream.io/?token=34663e6520564a09b488b82266a870da"
+                            allow="autoplay"
+                            allowFullScreen
+                            frameBorder={0}
+                            style={{ width: '100%', aspectRatio: '16/9', display: 'block' }}
+                        />
+                    </div>
+                </div>
+
                 {/* Status Bar */}
                 <motion.div
                     initial={{ opacity: 0, y: -10 }}
