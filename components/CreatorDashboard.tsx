@@ -3,7 +3,7 @@ import {
    User, Settings, DollarSign, TrendingUp, Calendar as CalendarIcon,
    Plus, Users, Bell, Check, X, Clock, Video,
    BarChart3, ArrowUpRight, MoreHorizontal, Heart, MessageSquare,
-   Trophy, Loader2, ChevronLeft, ChevronRight, Repeat, ChevronDown, Crown, Radio, Film
+   Trophy, Loader2, ChevronLeft, ChevronRight, Repeat, ChevronDown, Crown, Radio, Film, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { addMonths, subMonths, format } from 'date-fns';
@@ -42,13 +42,14 @@ import { CommunityPosts } from './CreatorDashboard/CommunityPosts';
 import { PlayoutControl } from './PlayoutControl';
 import { MessagingInbox } from './MessagingInbox';
 import EpisodeManager from './EpisodeManager';
+import { ContentEngine } from './ContentEngine';
 import { useToast } from './Toast';
 
 interface CreatorDashboardProps {
    onNavigate: (page: string, id?: string | number) => void;
 }
 
-type CreatorTab = 'studio' | 'live' | 'episodes' | 'merch' | 'community' | 'settings' | 'messages';
+type CreatorTab = 'studio' | 'live' | 'episodes' | 'merch' | 'community' | 'messages' | 'settings' | 'content-engine';
 
 export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }) => {
    const { backendUser, accessToken, logout } = useAuth();
@@ -494,6 +495,13 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                   Messages
                </button>
                <button
+                  onClick={() => setActiveTab('content-engine')}
+                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'content-engine' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
+               >
+                  <Zap className={`w-5 h-5 ${activeTab === 'content-engine' ? 'text-background' : ''}`} />
+                  Content Engine
+               </button>
+               <button
                   onClick={() => setActiveTab('settings')}
                   className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'settings' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
                >
@@ -520,6 +528,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                   { key: 'merch' as CreatorTab, icon: DollarSign, label: 'Merch' },
                   { key: 'community' as CreatorTab, icon: Users, label: 'Community' },
                   { key: 'messages' as CreatorTab, icon: MessageSquare, label: 'Messages' },
+                  { key: 'content-engine' as CreatorTab, icon: Zap, label: 'Content Engine' },
                   { key: 'settings' as CreatorTab, icon: Settings, label: 'Settings' },
                ]).map(({ key, icon: Icon, label }) => (
                   <button
@@ -1815,6 +1824,18 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                         exit={{ opacity: 0, scale: 0.98 }}
                      >
                         <CommunityPosts />
+                     </motion.div>
+                  )}
+
+                  {activeTab === 'content-engine' && (
+                     <motion.div
+                        key="content-engine"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.2 }}
+                     >
+                        <ContentEngine />
                      </motion.div>
                   )}
 

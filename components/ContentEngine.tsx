@@ -1,0 +1,573 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    Wallet, Zap, FileText, MessageSquare, Image, Clock,
+    ArrowRight, Loader2, Copy, Check, Radio, ChevronDown, ChevronUp
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../lib/AuthContext';
+import {
+    getDAPStatus, registerDAP, getDAPBalance, getDAPTransactions,
+    generateContent, getContentRunStatus, getLatestContent, getContentHistory,
+    getContentThumbnailUrl,
+    DAPStatus, DAPUser, DAPBalance, DAPTransaction, ContentPackage, ContentHistoryItem,
+} from '../lib/api';
+
+const PACKAGE_COSTS = {
+    'news-package': 100,
+    'stacks-package': 50,
+};
+
+export const ContentEngine: React.FC = () => {
+    const { accessToken, backendUser } = useAuth();
+
+    // DAP state
+    const [dapStatus, setDapStatus] = useState<DAPStatus | null>(null);
+    const [userBalance, setUserBalance] = useState<DAPBalance | null>(null);
+    const [userInfo, setUserInfo] = useState<DAPUser | null>(null);
+    const [transactions, setTransactions] = useState<DAPTransaction[]>([]);
+    const [stacksAddress, setStacksAddress] = useState('');
+    const [isRegistered, setIsRegistered] = useState(false);
+
+    // Generation state
+    const [serviceType, setServiceType] = useState<'news-package' | 'stacks-package'>('news-package');
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [generationError, setGenerationError] = useState<string | null>(null);
+
+    // Content state
+    const [latestContent, setLatestContent] = useState<ContentPackage | null>(null);
+    const [contentHistory, setContentHistory] = useState<ContentHistoryItem[]>([]);
+    const [activeContentTab, setActiveContentTab] = useState<'article' | 'thread' | 'thumbnail'>('article');
+
+    // UI state
+    const [loading, setLoading] = useState(true);
+    const [registering, setRegistering] = useState(false);
+    const [registerError, setRegisterError] = useState<string | null>(null);
+    const [copiedAddress, setCopiedAddress] = useState(false);
+    const [copiedMemo, setCopiedMemo] = useState(false);
+    const [historyOpen, setHistoryOpen] = useState(true);
+    const [txHistoryOpen, setTxHistoryOpen] = useState(false);
+
+    const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    const stopPolling = () => {
+        if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+        }
+    };
+
+    const refreshBalance = async (address: string) => {
+        if (!accessToken) return;
+        try {
+            const [bal, txData] = await Promise.all([
+                getDAPBalance(accessToken, address),
+                getDAPTransactions(accessToken, address),
+            ]);
+            setUserBalance(bal);
+            setTransactions(txData.transactions || []);
+        } catch (e) {
+            console.error('Failed to refresh balance:', e);
+        }
+    };
+
+    useEffect(() => {
+        if (!accessToken) return;
+
+        const init = async () => {
+            setLoading(true);
+            try {
+                const [status, content, history] = await Promise.all([
+                    getDAPStatus(accessToken),
+                    getLatestContent(accessToken).catch(() => null),
+                    getContentHistory(accessToken).catch(() => []),
+                ]);
+                setDapStatus(status);
+                if (content) setLatestContent(content);
+                setContentHistory(history);
+
+                // Check if user is already registered via backendUser stacks_address
+                const addr = (backendUser as any)?.stacks_address;
+                if (addr) {
+                    setStacksAddress(addr);
+                    try {
+                        const registered = await registerDAP(accessToken, addr);
+                        setUserInfo(registered);
+                        setIsRegistered(true);
+                        await refreshBalance(addr);
+                    } catch {
+                        // Not registered yet — that's fine
+                    }
+                }
+            } catch (e) {
+                console.error('ContentEngine init error:', e);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        init();
+        return () => stopPolling();
+    }, [accessToken]);
+
+    const handleRegister = async () => {
+        if (!accessToken || !stacksAddress.trim()) return;
+        setRegistering(true);
+        setRegisterError(null);
+        try {
+            const user = await registerDAP(accessToken, stacksAddress.trim());
+            setUserInfo(user);
+            setIsRegistered(true);
+            await refreshBalance(stacksAddress.trim());
+        } catch (e: any) {
+            setRegisterError(e.message || 'Registration failed');
+        } finally {
+            setRegistering(false);
+        }
+    };
+
+    const handleGenerate = async () => {
+        if (!accessToken || !userInfo) return;
+        setIsGenerating(true);
+        setGenerationError(null);
+
+        try {
+            await generateContent(accessToken, userInfo.stacks_address, serviceType);
+        } catch (e: any) {
+            setGenerationError(e.message || 'Failed to start generation');
+            setIsGenerating(false);
+            return;
+        }
+
+        // Poll for completion
+        pollIntervalRef.current = setInterval(async () => {
+            try {
+                const status = await getContentRunStatus(accessToken);
+                if (!status.running) {
+                    stopPolling();
+                    const [content, history] = await Promise.all([
+                        getLatestContent(accessToken),
+                        getContentHistory(accessToken),
+                    ]);
+                    setLatestContent(content);
+                    setContentHistory(history);
+                    setActiveContentTab('article');
+                    await refreshBalance(userInfo.stacks_address);
+                    setIsGenerating(false);
+                }
+            } catch {
+                stopPolling();
+                setIsGenerating(false);
+            }
+        }, 4000);
+    };
+
+    const copyToClipboard = (text: string, setter: (v: boolean) => void) => {
+        navigator.clipboard.writeText(text);
+        setter(true);
+        setTimeout(() => setter(false), 2000);
+    };
+
+    const balance = parseFloat(userBalance?.balance || '0');
+    const cost = PACKAGE_COSTS[serviceType];
+    const canGenerate = isRegistered && !isGenerating && balance >= cost;
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-gold" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-8">
+            <div>
+                <h1 className="text-4xl font-bold text-ink mb-2">Content Engine</h1>
+                <p className="text-inkLight font-medium">Generate news articles, X threads, and thumbnails using DAP credits.</p>
+            </div>
+
+            {/* DAP Wallet Section */}
+            <section className="bg-canvas border-2 border-gold/30 rounded-3xl p-6 md:p-8 shadow-soft">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-2xl bg-gold/10 flex items-center justify-center">
+                        <Wallet className="w-5 h-5 text-gold" />
+                    </div>
+                    <h2 className="text-xl font-bold text-ink">DAP Wallet</h2>
+                    {isRegistered && (
+                        <span className="ml-auto text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-200">
+                            Connected
+                        </span>
+                    )}
+                </div>
+
+                {!isRegistered ? (
+                    <div className="space-y-4">
+                        <p className="text-sm text-inkLight">Connect your Stacks wallet to access the credit system.</p>
+                        <div className="flex gap-3">
+                            <input
+                                type="text"
+                                value={stacksAddress}
+                                onChange={(e) => setStacksAddress(e.target.value)}
+                                placeholder="SP1234... (your Stacks address)"
+                                className="flex-1 bg-surface border border-borderSubtle rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-gold transition-colors"
+                            />
+                            <button
+                                onClick={handleRegister}
+                                disabled={registering || !stacksAddress.trim()}
+                                className="flex items-center gap-2 px-6 py-3 bg-gold-gradient text-white font-bold rounded-xl shadow-lg shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
+                            >
+                                {registering ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                                Connect Wallet
+                            </button>
+                        </div>
+                        {registerError && (
+                            <p className="text-sm text-red-500 font-medium">{registerError}</p>
+                        )}
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Balance */}
+                        <div className="bg-surface rounded-2xl p-5">
+                            <p className="text-xs font-bold text-inkLight uppercase tracking-widest mb-2">Credit Balance</p>
+                            <div className="text-5xl font-black text-gold mb-1">
+                                {balance.toLocaleString()}
+                            </div>
+                            <p className="text-xs text-inkLight">credits available</p>
+                            <button
+                                onClick={() => userInfo && refreshBalance(userInfo.stacks_address)}
+                                className="mt-3 text-xs font-bold text-inkLight hover:text-gold transition-colors"
+                            >
+                                Refresh balance
+                            </button>
+                        </div>
+
+                        {/* Deposit Info */}
+                        {dapStatus && userInfo && (
+                            <div className="bg-surface rounded-2xl p-5 space-y-3">
+                                <p className="text-xs font-bold text-inkLight uppercase tracking-widest">Deposit STX to Buy Credits</p>
+                                <p className="text-xs text-inkLight">Rate: <span className="text-ink font-bold">{dapStatus.credit_rate} credits / STX</span></p>
+
+                                <div>
+                                    <p className="text-xs text-inkLight mb-1">Deposit Address</p>
+                                    <div className="flex items-center gap-2 bg-canvas border border-borderSubtle rounded-xl px-3 py-2">
+                                        <span className="text-xs font-mono text-ink flex-1 truncate">{dapStatus.deposit_address}</span>
+                                        <button onClick={() => copyToClipboard(dapStatus.deposit_address, setCopiedAddress)}>
+                                            {copiedAddress ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-inkLight hover:text-gold transition-colors" />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <p className="text-xs text-inkLight mb-1">Your Memo Code <span className="text-red-500">(required)</span></p>
+                                    <div className="flex items-center gap-2 bg-canvas border border-borderSubtle rounded-xl px-3 py-2">
+                                        <span className="text-xs font-mono font-bold text-gold flex-1">{userInfo.memo_code}</span>
+                                        <button onClick={() => copyToClipboard(userInfo.memo_code, setCopiedMemo)}>
+                                            {copiedMemo ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-inkLight hover:text-gold transition-colors" />}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </section>
+
+            {/* Service Cards */}
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Content Generation Card */}
+                <div className="bg-canvas border border-borderSubtle rounded-3xl p-6 shadow-soft">
+                    <div className="flex items-center gap-3 mb-5">
+                        <div className="w-10 h-10 rounded-2xl bg-gold/10 flex items-center justify-center">
+                            <Zap className="w-5 h-5 text-gold" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-ink">Content Generation</h3>
+                            <p className="text-xs text-inkLight">Article + thread + thumbnail</p>
+                        </div>
+                    </div>
+
+                    {/* Package selector */}
+                    <div className="space-y-2 mb-5">
+                        {(['news-package', 'stacks-package'] as const).map((pkg) => (
+                            <button
+                                key={pkg}
+                                onClick={() => setServiceType(pkg)}
+                                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 text-sm font-bold transition-all ${
+                                    serviceType === pkg
+                                        ? 'border-gold bg-gold/5 text-ink'
+                                        : 'border-borderSubtle text-inkLight hover:border-gold/40'
+                                }`}
+                            >
+                                <span>{pkg === 'news-package' ? 'News Package' : 'Stacks Package'}</span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-black ${serviceType === pkg ? 'bg-gold text-white' : 'bg-surface text-inkLight'}`}>
+                                    {PACKAGE_COSTS[pkg]} cr
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {generationError && (
+                        <p className="text-sm text-red-500 font-medium mb-4">{generationError}</p>
+                    )}
+
+                    {isRegistered && balance < cost && !isGenerating && (
+                        <p className="text-xs text-amber-600 font-medium mb-4">
+                            Insufficient credits. You need {cost} credits (have {balance}).
+                        </p>
+                    )}
+
+                    <button
+                        onClick={handleGenerate}
+                        disabled={!canGenerate}
+                        className="w-full flex items-center justify-center gap-2 py-3.5 bg-gold-gradient text-white font-bold rounded-xl shadow-lg shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
+                    >
+                        {isGenerating ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Generating...
+                            </>
+                        ) : (
+                            <>
+                                <Zap className="w-4 h-4" />
+                                Generate — {cost} credits
+                            </>
+                        )}
+                    </button>
+
+                    {!isRegistered && (
+                        <p className="text-xs text-inkLight text-center mt-3">Connect your wallet to generate content</p>
+                    )}
+                </div>
+
+                {/* DCPE Playout Card (stub) */}
+                <div className="bg-canvas border border-borderSubtle rounded-3xl p-6 shadow-soft opacity-60 relative overflow-hidden">
+                    <div className="absolute top-4 right-4">
+                        <span className="text-xs font-black bg-surface text-inkLight px-3 py-1 rounded-full border border-borderSubtle uppercase tracking-widest">
+                            Coming Soon
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-3 mb-5">
+                        <div className="w-10 h-10 rounded-2xl bg-surface flex items-center justify-center">
+                            <Radio className="w-5 h-5 text-inkLight" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-inkLight">DCPE Playout</h3>
+                            <p className="text-xs text-inkLight">Automated broadcast scheduling</p>
+                        </div>
+                    </div>
+                    <p className="text-sm text-inkLight">
+                        Credit-gated playout engine scheduling. Auto-schedule and broadcast your generated content directly to your RTMP destinations.
+                    </p>
+                </div>
+            </section>
+
+            {/* Output & History Section */}
+            {latestContent && (
+                <section className="bg-canvas border border-borderSubtle rounded-3xl p-6 shadow-soft">
+                    <h3 className="text-xl font-bold text-ink mb-5">Latest Output</h3>
+
+                    {/* Content tabs */}
+                    <div className="flex gap-2 mb-6">
+                        {(['article', 'thread', 'thumbnail'] as const).map((tab) => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveContentTab(tab)}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                                    activeContentTab === tab
+                                        ? 'bg-gold text-white shadow'
+                                        : 'bg-surface text-inkLight hover:text-ink'
+                                }`}
+                            >
+                                {tab === 'article' && <FileText className="w-4 h-4" />}
+                                {tab === 'thread' && <MessageSquare className="w-4 h-4" />}
+                                {tab === 'thumbnail' && <Image className="w-4 h-4" />}
+                                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                            </button>
+                        ))}
+                    </div>
+
+                    <AnimatePresence mode="wait">
+                        {activeContentTab === 'article' && (
+                            <motion.div
+                                key="article"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.15 }}
+                                className="bg-surface rounded-2xl p-6"
+                            >
+                                {latestContent.narrativeAngle && (
+                                    <p className="text-xs font-bold text-gold uppercase tracking-widest mb-4">
+                                        Angle: {latestContent.narrativeAngle}
+                                    </p>
+                                )}
+                                <div className="text-sm text-ink leading-relaxed whitespace-pre-wrap font-medium">
+                                    {latestContent.articleText}
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {activeContentTab === 'thread' && (
+                            <motion.div
+                                key="thread"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.15 }}
+                                className="space-y-3"
+                            >
+                                {latestContent.threadText
+                                    .split(/\n(?=\d+\/)/)
+                                    .filter(t => t.trim())
+                                    .map((tweet, i) => (
+                                        <div key={i} className="bg-surface rounded-2xl p-4 border border-borderSubtle">
+                                            <div className="flex items-start gap-3">
+                                                <span className="w-6 h-6 rounded-full bg-gold/10 text-gold text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                                                    {i + 1}
+                                                </span>
+                                                <p className="text-sm text-ink leading-relaxed">{tweet.replace(/^\d+\/\n?/, '').trim()}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                            </motion.div>
+                        )}
+
+                        {activeContentTab === 'thumbnail' && (
+                            <motion.div
+                                key="thumbnail"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.15 }}
+                                className="flex justify-center"
+                            >
+                                <img
+                                    src={getContentThumbnailUrl(latestContent.date, 'landscape')}
+                                    alt="Generated thumbnail"
+                                    className="rounded-2xl max-w-full shadow-md"
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </section>
+            )}
+
+            {/* History Sections */}
+            <div className="space-y-4">
+                {/* Generation History */}
+                <section className="bg-canvas border border-borderSubtle rounded-3xl overflow-hidden shadow-soft">
+                    <button
+                        onClick={() => setHistoryOpen(v => !v)}
+                        className="w-full flex items-center justify-between px-6 py-4 hover:bg-surface/50 transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <Clock className="w-5 h-5 text-inkLight" />
+                            <span className="font-bold text-ink">Generation History</span>
+                            {contentHistory.length > 0 && (
+                                <span className="text-xs font-bold bg-surface text-inkLight px-2 py-0.5 rounded-full">
+                                    {contentHistory.length}
+                                </span>
+                            )}
+                        </div>
+                        {historyOpen ? <ChevronUp className="w-4 h-4 text-inkLight" /> : <ChevronDown className="w-4 h-4 text-inkLight" />}
+                    </button>
+
+                    <AnimatePresence>
+                        {historyOpen && (
+                            <motion.div
+                                initial={{ height: 0 }}
+                                animate={{ height: 'auto' }}
+                                exit={{ height: 0 }}
+                                style={{ overflow: 'hidden' }}
+                            >
+                                <div className="px-6 pb-4 space-y-2">
+                                    {contentHistory.length === 0 ? (
+                                        <p className="text-sm text-inkLight py-4 text-center">No generation history yet.</p>
+                                    ) : (
+                                        contentHistory.map((item) => (
+                                            <div
+                                                key={item.runId}
+                                                className="flex items-center gap-4 p-3 bg-surface rounded-xl border border-borderSubtle hover:border-gold/30 transition-colors cursor-pointer"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center shrink-0">
+                                                    <FileText className="w-4 h-4 text-gold" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-bold text-ink truncate">{item.narrativeAngle || item.runType}</p>
+                                                    <p className="text-xs text-inkLight">{new Date(item.generatedAt).toLocaleDateString()} · {item.runType}</p>
+                                                </div>
+                                                {item.hasThumbnail && (
+                                                    <Image className="w-4 h-4 text-inkLight shrink-0" />
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </section>
+
+                {/* Transaction History */}
+                {isRegistered && (
+                    <section className="bg-canvas border border-borderSubtle rounded-3xl overflow-hidden shadow-soft">
+                        <button
+                            onClick={() => setTxHistoryOpen(v => !v)}
+                            className="w-full flex items-center justify-between px-6 py-4 hover:bg-surface/50 transition-colors"
+                        >
+                            <div className="flex items-center gap-3">
+                                <Wallet className="w-5 h-5 text-inkLight" />
+                                <span className="font-bold text-ink">Transaction History</span>
+                                {transactions.length > 0 && (
+                                    <span className="text-xs font-bold bg-surface text-inkLight px-2 py-0.5 rounded-full">
+                                        {transactions.length}
+                                    </span>
+                                )}
+                            </div>
+                            {txHistoryOpen ? <ChevronUp className="w-4 h-4 text-inkLight" /> : <ChevronDown className="w-4 h-4 text-inkLight" />}
+                        </button>
+
+                        <AnimatePresence>
+                            {txHistoryOpen && (
+                                <motion.div
+                                    initial={{ height: 0 }}
+                                    animate={{ height: 'auto' }}
+                                    exit={{ height: 0 }}
+                                    style={{ overflow: 'hidden' }}
+                                >
+                                    <div className="px-6 pb-4 space-y-2">
+                                        {transactions.length === 0 ? (
+                                            <p className="text-sm text-inkLight py-4 text-center">No transactions yet.</p>
+                                        ) : (
+                                            transactions.map((tx) => (
+                                                <div key={tx.id} className="flex items-center gap-4 p-3 bg-surface rounded-xl border border-borderSubtle">
+                                                    <span className={`text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0 ${
+                                                        tx.type === 'mint'
+                                                            ? 'bg-green-50 text-green-700 border border-green-200'
+                                                            : 'bg-red-50 text-red-700 border border-red-200'
+                                                    }`}>
+                                                        {tx.type}
+                                                    </span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-bold text-ink truncate">{tx.description || tx.service_name}</p>
+                                                        <p className="text-xs text-inkLight">{new Date(tx.created_at).toLocaleDateString()}</p>
+                                                    </div>
+                                                    <span className={`text-sm font-black shrink-0 ${tx.type === 'mint' ? 'text-green-600' : 'text-red-500'}`}>
+                                                        {tx.type === 'mint' ? '+' : '-'}{tx.amount}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </section>
+                )}
+            </div>
+        </div>
+    );
+};

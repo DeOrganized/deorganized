@@ -2448,3 +2448,154 @@ export const findOrCreateThread = async (participantId: number, token: string): 
     if (!createResp.ok) throw new Error('Failed to create thread');
     return createResp.json();
 };
+
+// ============================================
+// DAP CREDIT SYSTEM & CONTENT ENGINE
+// ============================================
+
+export interface DAPStatus {
+    status: string;
+    deposit_address: string;
+    credit_rate: number;
+    watcher: {
+        last_poll_at: string;
+        is_polling: boolean;
+    };
+    timestamp: string;
+}
+
+export interface DAPUser {
+    id: number;
+    stacks_address: string;
+    memo_code: string;
+    credit_balance: string;
+    created_at: string;
+    already_registered?: boolean;
+}
+
+export interface DAPBalance {
+    stacks_address: string;
+    balance: string;
+    updated_at: string;
+}
+
+export interface DAPTransaction {
+    id: number;
+    type: 'mint' | 'deduct';
+    amount: string;
+    description: string;
+    service_name: string;
+    created_at: string;
+}
+
+export interface DAPTransactionsResponse {
+    stacks_address: string;
+    transactions: DAPTransaction[];
+    limit: number;
+    offset: number;
+}
+
+export interface ContentPackage {
+    date: string;
+    threadText: string;
+    articleText: string;
+    narrativeAngle: string;
+}
+
+export interface ContentHistoryItem {
+    runId: string;
+    date: string;
+    runType: string;
+    generatedAt: string;
+    narrativeAngle: string;
+    hasThumbnail: boolean;
+}
+
+export interface RunStatus {
+    running: boolean;
+}
+
+export const getDAPStatus = async (token: string): Promise<DAPStatus> => {
+    const res = await fetch(`${API_BASE_URL}/dap/status/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch DAP status');
+    return res.json();
+};
+
+export const registerDAP = async (token: string, stacks_address: string): Promise<DAPUser> => {
+    const res = await fetch(`${API_BASE_URL}/dap/register/`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ stacks_address }),
+    });
+    if (!res.ok) throw new Error('Failed to register with DAP');
+    return res.json();
+};
+
+export const getDAPBalance = async (token: string, address: string): Promise<DAPBalance> => {
+    const res = await fetch(`${API_BASE_URL}/dap/balance/${address}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch DAP balance');
+    return res.json();
+};
+
+export const getDAPTransactions = async (token: string, address: string): Promise<DAPTransactionsResponse> => {
+    const res = await fetch(`${API_BASE_URL}/dap/transactions/${address}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch transactions');
+    return res.json();
+};
+
+export const generateContent = async (
+    token: string,
+    stacks_address: string,
+    service_type: 'news-package' | 'stacks-package'
+): Promise<{ success: boolean; credits_deducted: number; new_balance: number; message: string }> => {
+    const res = await fetch(`${API_BASE_URL}/content/generate/`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ stacks_address, service_type }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).error || 'Failed to generate content');
+    }
+    return res.json();
+};
+
+export const getContentRunStatus = async (token: string): Promise<RunStatus> => {
+    const res = await fetch(`${API_BASE_URL}/content/status/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch run status');
+    return res.json();
+};
+
+export const getLatestContent = async (token: string): Promise<ContentPackage> => {
+    const res = await fetch(`${API_BASE_URL}/content/latest/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch latest content');
+    return res.json();
+};
+
+export const getContentHistory = async (token: string, limit = 10): Promise<ContentHistoryItem[]> => {
+    const res = await fetch(`${API_BASE_URL}/content/history/?limit=${limit}`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch content history');
+    return res.json();
+};
+
+export const getContentThumbnailUrl = (date: string, format: 'landscape' | 'square' = 'landscape'): string => {
+    return `${API_BASE_URL}/content/thumbnail/${date}/${format}/`;
+};
