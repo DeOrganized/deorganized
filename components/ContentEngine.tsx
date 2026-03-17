@@ -72,7 +72,11 @@ export const ContentEngine: React.FC = () => {
     };
 
     useEffect(() => {
-        if (!accessToken) return;
+        // Not logged in — show the "connect wallet" message immediately, no spinner
+        if (!accessToken || !backendUser) {
+            setLoading(false);
+            return;
+        }
 
         const init = async () => {
             setLoading(true);
@@ -86,17 +90,12 @@ export const ContentEngine: React.FC = () => {
                 if (content) setLatestContent(content);
                 setContentHistory(history);
 
-                // Auto-register with DAP using the address from the logged-in user
-                const addr = backendUser?.stacks_address;
+                const addr = backendUser.stacks_address;
                 if (addr) {
-                    try {
-                        const registered = await registerDAP(accessToken, addr);
-                        setUserInfo(registered);
-                        setIsRegistered(true);
-                        await refreshBalance(addr);
-                    } catch {
-                        // Not registered yet — that's fine
-                    }
+                    const registered = await registerDAP(accessToken, addr);
+                    setUserInfo(registered);
+                    setIsRegistered(true);
+                    await refreshBalance(addr);
                 }
             } catch (e) {
                 console.error('ContentEngine init error:', e);
@@ -107,7 +106,7 @@ export const ContentEngine: React.FC = () => {
 
         init();
         return () => stopPolling();
-    }, [accessToken]);
+    }, [accessToken, backendUser]);
 
     const handleGenerate = async () => {
         if (!accessToken || !userInfo) return;
@@ -185,10 +184,21 @@ export const ContentEngine: React.FC = () => {
                 </div>
 
                 {!isRegistered ? (
-                    <div className="flex items-center gap-3 py-4">
-                        <Wallet className="w-5 h-5 text-inkLight shrink-0" />
-                        <p className="text-sm text-inkLight">Log in with your Stacks wallet to access the Content Engine.</p>
-                    </div>
+                    !backendUser ? (
+                        <div className="py-4 space-y-1">
+                            <p className="text-sm font-bold text-ink">Connect your wallet to get started</p>
+                            <p className="text-xs text-inkLight">Use the Connect Wallet button in the top navigation bar to log in with your Stacks wallet.</p>
+                        </div>
+                    ) : !backendUser.stacks_address ? (
+                        <div className="flex items-center gap-3 py-4">
+                            <p className="text-sm text-red-500 font-medium">Your account doesn't have a Stacks address associated. Please contact support.</p>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 py-4">
+                            <Loader2 className="w-4 h-4 animate-spin text-gold shrink-0" />
+                            <p className="text-sm text-inkLight">Connecting to DAP...</p>
+                        </div>
+                    )
                 ) : (
                     <div className="space-y-4">
                     {/* Stacks Wallet Token Balances */}
@@ -316,8 +326,8 @@ export const ContentEngine: React.FC = () => {
                         )}
                     </button>
 
-                    {!isRegistered && (
-                        <p className="text-xs text-inkLight text-center mt-3">Connect your wallet to generate content</p>
+                    {!isRegistered && !backendUser && (
+                        <p className="text-xs text-inkLight text-center mt-3">Log in via the navbar to generate content</p>
                     )}
                 </div>
 
