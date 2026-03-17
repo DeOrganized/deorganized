@@ -2627,3 +2627,122 @@ export const getStacksWalletBalances = async (address: string): Promise<StacksWa
         usdcx: (Number(usdcxRaw) / 1_000_000).toFixed(2),
     };
 };
+
+// ============================================
+// ADMIN — AGENT CONTROLLER & NEWS PRODUCTION
+// ============================================
+
+export interface ElioWallet {
+    addresses: {
+        btc: string;
+        stx: string;
+        taproot: string | null;
+    };
+    balances: {
+        btc: { sats: number; btc: string; txCount: number };
+        stx: { microStx: number; stx: string };
+    };
+}
+
+export interface ChatResponse {
+    response: {
+        reply: string;
+    };
+}
+
+export interface SocialAgentWallet {
+    stx: { spendable: number; total: number; locked: number };
+    sbtc: { sats: number; btc: number };
+    usdcx: { micro: number; dollars: number };
+    address: string;
+}
+
+export interface SocialAgentStatus {
+    agent: string;
+    stx_address: string;
+    running: boolean;
+    last_run_at: string | null;
+    last_run_status: string | null;
+    last_error: string | null;
+    last_post_ids: string | null;
+    credit_balance: string;
+}
+
+// --- Long Elio ---
+
+export const getElioWallet = async (token: string): Promise<ElioWallet> => {
+    const res = await fetch(`${API_BASE_URL}/agent/wallet/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch Elio wallet');
+    return res.json();
+};
+
+export const chatWithElio = async (token: string, message: string): Promise<ChatResponse> => {
+    const res = await fetch(`${API_BASE_URL}/agent/chat/`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message }),
+    });
+    if (!res.ok) throw new Error('Failed to chat with Elio');
+    return res.json();
+};
+
+// --- Social Agent ---
+
+export const getSocialAgentWallet = async (token: string): Promise<SocialAgentWallet> => {
+    const res = await fetch(`${API_BASE_URL}/agent/social/wallet/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch social agent wallet');
+    return res.json();
+};
+
+export const getSocialAgentStatus = async (token: string): Promise<SocialAgentStatus> => {
+    const res = await fetch(`${API_BASE_URL}/agent/social/status/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch social agent status');
+    return res.json();
+};
+
+export const getSocialAgentBalance = async (token: string): Promise<DAPBalance> => {
+    const res = await fetch(`${API_BASE_URL}/agent/social/balance/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch social agent balance');
+    return res.json();
+};
+
+export const getSocialAgentTransactions = async (token: string): Promise<DAPTransactionsResponse> => {
+    const res = await fetch(`${API_BASE_URL}/agent/social/transactions/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch social agent transactions');
+    return res.json();
+};
+
+// --- News Production (admin direct trigger, no DAP credits) ---
+
+export const triggerNewsGeneration = async (
+    token: string,
+    runType: 'news' | 'stacks',
+    operatorPrompt?: string
+): Promise<{ running: boolean }> => {
+    const endpoint = runType === 'stacks'
+        ? `${API_BASE_URL}/content/generate-stacks/`
+        : `${API_BASE_URL}/content/generate-admin/`;
+    const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ operatorPrompt }),
+    });
+    if (!res.ok) throw new Error('Failed to trigger generation');
+    return res.json();
+};

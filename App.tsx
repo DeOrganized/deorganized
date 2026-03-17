@@ -45,7 +45,7 @@ function parseUrl(pathname: string): { page: PageView; id: string | number | nul
     case 'edit-profile':
       return { page: 'edit-profile', id: null };
     case 'admin':
-      return { page: 'admin', id: null };
+      return { page: 'admin', id: param }; // param holds the tab name if present
     case 'community':
       return { page: 'community', id: null };
     case 'playout':
@@ -69,7 +69,7 @@ function pageToUrl(page: PageView, id?: string | number | null): string {
     case 'dashboard': return id ? `/dashboard/${id}` : '/dashboard';
     case 'user-profile': return '/profile';
     case 'edit-profile': return '/edit-profile';
-    case 'admin': return '/admin';
+    case 'admin': return id ? `/admin/${id}` : '/admin';
     case 'community': return '/community';
     case 'playout-control': return '/playout';
     case 'register': return '/register';

@@ -5,7 +5,7 @@ import {
     UserPlus, TrendingUp, Shield, CheckCircle, XCircle,
     Search, ChevronLeft, ChevronRight, AlertCircle,
     BarChart3, Eye, Clock, Filter, RefreshCw, Star,
-    ShoppingBag, Send, Zap, Settings, Layout, Globe
+    ShoppingBag, Send, Zap, Settings, Layout, Globe, Bot
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { API_BASE_URL } from '../lib/api';
@@ -13,6 +13,8 @@ import { getValidAccessToken } from '../lib/walletAuth';
 import { MerchTracker } from './CreatorDashboard/MerchTracker';
 import { CommunityPosts } from './CreatorDashboard/CommunityPosts';
 import { PlayoutControl } from './PlayoutControl';
+import { AgentController } from './AgentController';
+import { NewsProductionStudio } from './NewsProductionStudio';
 import { useToast } from './Toast';
 
 // ============================================
@@ -154,7 +156,14 @@ async function updateFeedback(
 // Component
 // ============================================
 
-type AdminTab = 'overview' | 'users' | 'feedback' | 'playout' | 'settings';
+type AdminTab = 'overview' | 'users' | 'feedback' | 'playout' | 'agent-controller' | 'news-production' | 'settings';
+
+const ADMIN_VALID_TABS: AdminTab[] = ['overview', 'users', 'feedback', 'playout', 'agent-controller', 'news-production', 'settings'];
+
+function getAdminTabFromUrl(): AdminTab {
+    const seg = window.location.pathname.split('/')[2];
+    return ADMIN_VALID_TABS.includes(seg as AdminTab) ? (seg as AdminTab) : 'overview';
+}
 
 interface AdminDashboardProps {
     onNavigate: (page: string, id?: string | number) => void;
@@ -163,7 +172,28 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
     const { backendUser } = useAuth();
     const toast = useToast();
-    const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+    const [activeTab, setActiveTab] = useState<AdminTab>(getAdminTabFromUrl);
+
+    const navigateToAdminTab = (tab: AdminTab) => {
+        setActiveTab(tab);
+        window.history.pushState({}, '', `/admin/${tab}`);
+    };
+
+    // Normalize URL on mount (/admin → /admin/overview)
+    useEffect(() => {
+        const seg = window.location.pathname.split('/')[2];
+        if (!ADMIN_VALID_TABS.includes(seg as AdminTab)) {
+            window.history.replaceState({}, '', `/admin/${activeTab}`);
+        }
+    }, []);
+
+    // Sync tab on back/forward
+    useEffect(() => {
+        const onPopState = () => setActiveTab(getAdminTabFromUrl());
+        window.addEventListener('popstate', onPopState);
+        return () => window.removeEventListener('popstate', onPopState);
+    }, []);
+
     const [stats, setStats] = useState<AdminStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -186,11 +216,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
 
     const isCreator = backendUser?.role === 'creator';
     const isStaff = backendUser?.is_staff;
-
-    // Default to 'overview'
-    useEffect(() => {
-        setActiveTab('overview');
-    }, []);
 
     // Load stats on mount (Staff only)
     useEffect(() => {
@@ -322,6 +347,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
         { id: 'users' as AdminTab, label: 'User Directory', icon: Users },
         { id: 'feedback' as AdminTab, label: 'User Feedback', icon: MessageSquare },
         { id: 'playout' as AdminTab, label: 'Playout Engine', icon: Radio },
+        { id: 'agent-controller' as AdminTab, label: 'Agent Controller', icon: Bot },
+        { id: 'news-production' as AdminTab, label: 'News Production', icon: Newspaper },
         { id: 'settings' as AdminTab, label: 'Preferences', icon: Settings },
     ];
 
@@ -356,7 +383,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                     {sidebarItems.map((item) => (
                         <button
                             key={item.id}
-                            onClick={() => setActiveTab(item.id)}
+                            onClick={() => navigateToAdminTab(item.id)}
                             className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${
                                 activeTab === item.id
                                     ? 'bg-ink text-canvas shadow-xl'
@@ -607,6 +634,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                         <PlayoutControl onNavigate={onNavigate} adminView={true} />
                                      </div>
                                 </div>
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'agent-controller' && (
+                            <motion.div
+                                key="agent-controller"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.2 }}
+                            >
+                                <AgentController />
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'news-production' && (
+                            <motion.div
+                                key="news-production"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.2 }}
+                            >
+                                <NewsProductionStudio />
                             </motion.div>
                         )}
 
