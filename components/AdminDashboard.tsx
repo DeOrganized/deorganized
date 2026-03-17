@@ -558,7 +558,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                         </thead>
                                         <tbody className="divide-y divide-borderSubtle/50">
                                             {users.map(user => (
-                                                <tr key={user.id} className="hover:bg-surface/30 transition-colors">
+                                                <tr
+                                                    key={user.id}
+                                                    className="hover:bg-surface/30 transition-colors cursor-pointer"
+                                                    onClick={() => onNavigate('creator-detail', user.username)}
+                                                >
                                                     <td className="px-8 py-5">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-10 h-10 rounded-xl bg-surface border border-borderSubtle flex items-center justify-center font-bold">
@@ -576,8 +580,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                                         )}
                                                     </td>
                                                     <td className="px-8 py-5 text-right">
-                                                        <button 
-                                                            onClick={() => handleToggleVerification(user.id)}
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleToggleVerification(user.id); }}
                                                             className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
                                                                 user.is_verified ? 'text-red-500 hover:bg-red-50' : 'text-gold hover:bg-gold/5'
                                                             }`}
