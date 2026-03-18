@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Menu, X, Globe, User, Wallet, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useTheme } from '../lib/ThemeContext';
-import { fetchNotifications } from '../lib/api';
+import { fetchNotifications, getDapNotifications, markDapNotificationsRead } from '../lib/api';
+import { useToast } from './Toast';
 
 interface NavbarProps {
   onNavigate?: (page: string) => void;
@@ -32,6 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
   } = useAuth();
 
   const { isDarkMode, toggleDarkMode } = useTheme();
+  const toast = useToast();
 
   // Handle wallet connection with routing
   const handleConnect = async () => {
@@ -104,6 +106,25 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
     loadNotifications();
     // Poll for new notifications every 30 seconds
     const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [isBackendAuthenticated, accessToken]);
+
+  // Show DAP credit notifications as toasts on mount and every 60 seconds
+  useEffect(() => {
+    if (!isBackendAuthenticated || !accessToken) return;
+    const checkDapNotifications = async () => {
+      const events = await getDapNotifications(accessToken);
+      if (events.length === 0) return;
+      events.forEach(e => {
+        const label = e.points > 0
+          ? `+${e.points.toLocaleString()} DAP credits — ${e.description}`
+          : `${e.points.toLocaleString()} DAP credits — ${e.description}`;
+        e.points > 0 ? toast.success(label, 6000) : toast.info(label, 6000);
+      });
+      await markDapNotificationsRead(accessToken);
+    };
+    checkDapNotifications();
+    const interval = setInterval(checkDapNotifications, 60000);
     return () => clearInterval(interval);
   }, [isBackendAuthenticated, accessToken]);
 

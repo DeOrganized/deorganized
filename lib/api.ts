@@ -2686,6 +2686,55 @@ export const getDAPTransactions = async (token: string, address: string): Promis
     return res.json();
 };
 
+export const adminDapGrant = async (
+    token: string,
+    stacks_address: string,
+    amount: number,
+    description: string,
+): Promise<{ success: boolean; new_balance: number | null; amount: number; description: string }> => {
+    const res = await fetch(`${API_BASE_URL}/admin/dap/grant/`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stacks_address, amount, description }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).error || 'Grant failed');
+    }
+    return res.json();
+};
+
+export interface DapNotification {
+    id: number;
+    action: string;
+    points: number;
+    description: string;
+    created_at: string;
+}
+
+export const getDapNotifications = async (token: string): Promise<DapNotification[]> => {
+    try {
+        const res = await fetch(`${API_BASE_URL}/users/dap-notifications/`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return [];
+        return res.json();
+    } catch {
+        return [];
+    }
+};
+
+export const markDapNotificationsRead = async (token: string): Promise<void> => {
+    try {
+        await fetch(`${API_BASE_URL}/users/dap-notifications-mark-read/`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+    } catch {
+        // non-fatal
+    }
+};
+
 export const generateContent = async (
     token: string,
     stacks_address: string,

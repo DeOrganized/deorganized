@@ -498,6 +498,10 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                <p className="text-inkLight text-sm mb-7">
                   Upgrade to a free Creator account to access the Content Engine, live scheduling, episode management, and more.
                </p>
+               <div className="flex items-center justify-center gap-2 bg-gold/10 border border-gold/30 rounded-2xl px-4 py-3 mb-5">
+                  <Zap className="w-4 h-4 text-gold shrink-0" />
+                  <p className="text-sm font-bold text-gold">Upgrade now and receive 1,000 DAP credits to start generating content!</p>
+               </div>
                {upgradeError && (
                   <p className="text-sm text-red-500 font-medium mb-4">{upgradeError}</p>
                )}

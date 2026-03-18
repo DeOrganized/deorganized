@@ -8,7 +8,7 @@ import {
     ShoppingBag, Send, Zap, Settings, Layout, Globe, Bot, X, ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
-import { API_BASE_URL } from '../lib/api';
+import { API_BASE_URL, adminDapGrant } from '../lib/api';
 import { getValidAccessToken } from '../lib/walletAuth';
 import { MerchTracker } from './CreatorDashboard/MerchTracker';
 import { CommunityPosts } from './CreatorDashboard/CommunityPosts';
@@ -236,6 +236,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     const [permActive, setPermActive] = useState(true);
     const [permSaving, setPermSaving] = useState(false);
 
+    // Grant DAP state (inside permissions modal)
+    const [grantAmount, setGrantAmount] = useState('');
+    const [grantDescription, setGrantDescription] = useState('');
+    const [grantSaving, setGrantSaving] = useState(false);
+
     const openPermissionsModal = (user: AdminUser) => {
         setManagingUser(user);
         setPermRole(user.role);
@@ -261,6 +266,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
             toast.error(e.message || 'Failed to update permissions');
         } finally {
             setPermSaving(false);
+        }
+    };
+
+    const handleGrantDap = async () => {
+        if (!managingUser?.stacks_address || !grantAmount) return;
+        const amount = parseInt(grantAmount, 10);
+        if (!amount || amount <= 0) { toast.error('Enter a valid amount'); return; }
+        setGrantSaving(true);
+        try {
+            const token = await getValidAccessToken();
+            if (!token) throw new Error('Not authenticated');
+            const result = await adminDapGrant(token, managingUser.stacks_address, amount, grantDescription || 'Admin grant');
+            const balMsg = result.new_balance != null ? ` · New balance: ${result.new_balance.toLocaleString()} cr` : '';
+            toast.success(`Granted ${amount} DAP credits to ${managingUser.username}${balMsg}`);
+            setGrantAmount('');
+            setGrantDescription('');
+        } catch (e: any) {
+            toast.error(e.message || 'Grant failed');
+        } finally {
+            setGrantSaving(false);
         }
     };
 
@@ -822,6 +847,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                             >
                                 {permSaving ? 'Saving…' : 'Save Permissions'}
                             </button>
+
+                            {/* Grant DAP Credits */}
+                            {managingUser.stacks_address && (
+                                <div className="mt-5 pt-5 border-t border-borderSubtle">
+                                    <p className="text-xs font-black text-inkLight uppercase tracking-widest mb-3">Grant DAP Credits</p>
+                                    <div className="flex gap-2 mb-2">
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            placeholder="Amount"
+                                            value={grantAmount}
+                                            onChange={e => setGrantAmount(e.target.value)}
+                                            className="w-24 bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm font-bold text-ink focus:outline-none focus:border-gold/60"
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Description (optional)"
+                                            value={grantDescription}
+                                            onChange={e => setGrantDescription(e.target.value)}
+                                            className="flex-1 bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleGrantDap}
+                                        disabled={grantSaving || !grantAmount}
+                                        className="w-full py-2.5 border-2 border-dashed border-gold/40 rounded-xl text-sm font-bold text-gold hover:border-gold hover:bg-gold/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        <Zap className="w-4 h-4" />
+                                        {grantSaving ? 'Granting…' : 'Grant Credits'}
+                                    </button>
+                                </div>
+                            )}
                         </motion.div>
                     </motion.div>
                 )}
