@@ -7,12 +7,12 @@ export const TOKEN_CONTRACTS = {
     mainnet: {
       address: "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4",
       name: "sbtc-token",
-      tokenDefinedName: "sbtc-token",
+      tokenDefinedName: "sbtc",  // define-fungible-token uses 'sbtc', not the contract name
     },
     testnet: {
       address: "ST1F1M4YP6WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4",
       name: "sbtc-token",
-      tokenDefinedName: "sbtc-token",
+      tokenDefinedName: "sbtc",
     },
   },
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Heart, Loader2, ExternalLink, DollarSign } from 'lucide-react';
+import { X, Heart, Loader2, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetchTipPaymentInfo, sendTip, TipPaymentInfo, getImageUrl } from '../lib/api';
 import { useAuth } from '../lib/AuthContext';
@@ -9,7 +9,23 @@ interface TipModalProps {
     onClose: () => void;
 }
 
-const QUICK_AMOUNTS = [1, 5, 10, 25, 50];
+const QUICK_AMOUNTS: Record<'STX' | 'USDCx' | 'sBTC', number[]> = {
+    STX:   [1, 5, 10, 25, 50],
+    USDCx: [1, 5, 10, 25, 50],
+    sBTC:  [0.0001, 0.001, 0.01, 0.05, 0.1],
+};
+
+const TOKEN_STEP: Record<'STX' | 'USDCx' | 'sBTC', string> = {
+    STX:   '0.01',
+    USDCx: '0.01',
+    sBTC:  '0.00000001',
+};
+
+const TOKEN_PLACEHOLDER: Record<'STX' | 'USDCx' | 'sBTC', string> = {
+    STX:   '0.00',
+    USDCx: '0.00',
+    sBTC:  '0.00000000',
+};
 
 const TipModal: React.FC<TipModalProps> = ({ creatorId, onClose }) => {
     const { accessToken, walletAddress, backendUser } = useAuth();
@@ -157,7 +173,7 @@ const TipModal: React.FC<TipModalProps> = ({ creatorId, onClose }) => {
                             {(['USDCx', 'STX', 'sBTC'] as const).map(t => (
                                 <button
                                     key={t}
-                                    onClick={() => setTokenType(t)}
+                                    onClick={() => { setTokenType(t); setAmount(''); }}
                                     className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${tokenType === t
                                             ? 'bg-gold text-background'
                                             : 'bg-background/50 border border-borderSubtle text-inkLight hover:border-gold/30'
@@ -170,7 +186,7 @@ const TipModal: React.FC<TipModalProps> = ({ creatorId, onClose }) => {
 
                         {/* Quick amounts */}
                         <div className="flex flex-wrap gap-2 mb-4">
-                            {QUICK_AMOUNTS.map(a => (
+                            {QUICK_AMOUNTS[tokenType].map(a => (
                                 <button
                                     key={a}
                                     onClick={() => setAmount(a.toString())}
@@ -186,15 +202,17 @@ const TipModal: React.FC<TipModalProps> = ({ creatorId, onClose }) => {
 
                         {/* Custom amount */}
                         <div className="relative mb-5">
-                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-inkLight" />
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-inkLight pointer-events-none select-none">
+                                {tokenType}
+                            </span>
                             <input
                                 type="number"
-                                step="0.01"
+                                step={TOKEN_STEP[tokenType]}
                                 min="0"
                                 value={amount}
-                                onChange={e => setAmount(e.target.value)}
-                                placeholder={`Custom ${tokenType} amount`}
-                                className="w-full pl-9 pr-4 py-3 rounded-xl bg-transparent border border-inkLight/30 text-ink text-sm focus:ring-2 focus:ring-gold/30 focus:border-gold/50 outline-none transition-all"
+                                onChange={e => { setAmount(e.target.value); }}
+                                placeholder={TOKEN_PLACEHOLDER[tokenType]}
+                                className="w-full pl-14 pr-4 py-3 rounded-xl bg-transparent border border-inkLight/30 text-ink text-sm focus:ring-2 focus:ring-gold/30 focus:border-gold/50 outline-none transition-all"
                             />
                         </div>
 
