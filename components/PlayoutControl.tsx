@@ -2,14 +2,14 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     Activity, AlertTriangle, ArrowDown, ArrowUp, Calendar, Check, CheckCircle, ChevronDown, ChevronRight, ChevronUp, Clock, Crown, Disc,
     Eye, EyeOff, Loader2, List, Monitor, Pause, Play, Plus, Radio, RefreshCw,
-    Save, Server, SkipBack, SkipForward, ToggleLeft, ToggleRight, Trash2, Tv, Upload, Volume2, Wifi, WifiOff, X
+    Save, Server, SkipBack, SkipForward, ToggleLeft, ToggleRight, Trash2, Tv, Upload, Volume2, Wifi, WifiOff, X, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../lib/AuthContext';
 import {
     dcpeHealth, dcpeStatus, dcpePlaylists, dcpeSetPlaylist,
     dcpeAdvance, dcpeStreamStart, dcpeStreamStop, dcpeCreateFolder, dcpeUpload,
-    dcpeSetPlaylistOrder,
+    dcpeSetPlaylistOrder, adminDcpeKill,
     DCPEStatus, DCPEPlaylist,
     fetchRTMPDestinations, createRTMPDestination, updateRTMPDestination, deleteRTMPDestination,
     RTMPDestination, PLATFORM_LABELS, DEFAULT_RTMP_URLS,
@@ -48,6 +48,7 @@ export const PlayoutControl: React.FC<PlayoutControlProps> = ({ onNavigate, admi
 
     // Actions
     const [advancing, setAdvancing] = useState(false);
+    const [isKilling, setIsKilling] = useState(false);
 
     // File upload
     const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -279,6 +280,21 @@ export const PlayoutControl: React.FC<PlayoutControlProps> = ({ onNavigate, admi
             setTimeout(fetchStatus, 2000);
         } catch (error: any) {
             log(`Stream stop failed: ${error.message}`, 'error');
+        }
+    };
+
+    const handleEmergencyKill = async () => {
+        if (!accessToken) return;
+        setIsKilling(true);
+        try {
+            log('🚨 Emergency kill sent — stopping all streams...', 'info');
+            await adminDcpeKill(accessToken);
+            log('✅ Emergency kill executed — stream stopped and session cleared', 'success');
+            setTimeout(fetchStatus, 2000);
+        } catch (error: any) {
+            log(`Emergency kill failed: ${error.message}`, 'error');
+        } finally {
+            setIsKilling(false);
         }
     };
 
@@ -883,8 +899,8 @@ export const PlayoutControl: React.FC<PlayoutControlProps> = ({ onNavigate, admi
                                         onClick={handleStreamStop}
                                         disabled={!isStaff}
                                         title={!isStaff ? 'Admin only' : 'Disable RTMP pushing'}
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold transition-all ${isStaff 
-                                            ? 'bg-red-500 text-white hover:bg-red-600' 
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold transition-all ${isStaff
+                                            ? 'bg-red-500 text-white hover:bg-red-600'
                                             : 'bg-red-500/20 text-white/40 cursor-not-allowed'}`}
                                     >
                                         <WifiOff className="w-3.5 h-3.5" />
@@ -892,6 +908,22 @@ export const PlayoutControl: React.FC<PlayoutControlProps> = ({ onNavigate, admi
                                     </button>
                                 )}
                             </div>
+
+                            {/* Emergency kill — admin panel only, always available when streaming */}
+                            {adminView && status?.streaming_enabled && (
+                                <button
+                                    type="button"
+                                    onClick={handleEmergencyKill}
+                                    disabled={isKilling}
+                                    title="Emergency stop — kills the stream immediately regardless of session owner"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold bg-red-600 text-white hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed ml-1"
+                                >
+                                    {isKilling
+                                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        : <Zap className="w-3.5 h-3.5" />}
+                                    {isKilling ? 'Killing...' : 'Kill Stream'}
+                                </button>
+                            )}
 
                             {/* Back button — staff only */}
                             <button

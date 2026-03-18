@@ -78,6 +78,8 @@ export const PlayoutEngine: React.FC = () => {
     const [isGoingLive, setIsGoingLive]     = useState(false);
     const [isStopping, setIsStopping]       = useState(false);
     const [streamError, setStreamError]     = useState<string | null>(null);
+    const [sessionOwnerId, setSessionOwnerId]         = useState<number | null>(null);
+    const [sessionOwnerUsername, setSessionOwnerUsername] = useState<string | null>(null);
 
     // ── UI ────────────────────────────────────────────────────────────────────
     const [loading, setLoading]             = useState(true);
@@ -119,7 +121,11 @@ export const PlayoutEngine: React.FC = () => {
                     dcpeCreatorStatus(accessToken).catch(() => null),
                 ]);
                 setDapStatus(status);
-                if (dcpeState) setIsStreaming(!!dcpeState.rtmp_connected && !!dcpeState.streaming_enabled);
+                if (dcpeState) {
+                    setIsStreaming(!!dcpeState.rtmp_connected && !!dcpeState.streaming_enabled);
+                    setSessionOwnerId(dcpeState.session_owner_id ?? null);
+                    setSessionOwnerUsername(dcpeState.session_owner_username ?? null);
+                }
 
                 const addr = backendUser.stacks_address;
                 if (addr) {
@@ -295,7 +301,19 @@ export const PlayoutEngine: React.FC = () => {
             await dcpeCreatorSetPlaylist(folderSlug, accessToken);
             await dcpeCreatorStreamStart(accessToken);
             setIsStreaming(true);
+            setSessionOwnerId(backendUser?.id ?? null);
+            setSessionOwnerUsername(backendUser?.username ?? null);
         } catch (e: any) {
+            if (e.status === 409) {
+                setSessionOwnerUsername(e.session_owner_username || 'another creator');
+                // Refresh actual stream state so UI reflects reality
+                try {
+                    const s = await dcpeCreatorStatus(accessToken);
+                    setIsStreaming(!!s.rtmp_connected && !!s.streaming_enabled);
+                    setSessionOwnerId(s.session_owner_id ?? null);
+                    setSessionOwnerUsername(s.session_owner_username ?? null);
+                } catch {}
+            }
             setStreamError(e.message || 'Failed to go live');
         } finally {
             setIsGoingLive(false);
@@ -309,6 +327,8 @@ export const PlayoutEngine: React.FC = () => {
         try {
             await dcpeCreatorStreamStop(accessToken);
             setIsStreaming(false);
+            setSessionOwnerId(null);
+            setSessionOwnerUsername(null);
         } catch (e: any) {
             setStreamError(e.message || 'Failed to stop stream');
         } finally {
@@ -347,7 +367,8 @@ export const PlayoutEngine: React.FC = () => {
     const uploadedFiles      = files.filter(f => f.status === 'uploaded');
     const canPrep            = uploadedFiles.length > 0 && !isPrepping && prepJobStatus === 'idle';
     const allFilesReady      = prepJobStatus === 'ready';
-    const canGoLive          = allFilesReady && !isStreaming && !isGoingLive && !!folderSlug;
+    const streamInUse        = isStreaming && sessionOwnerId !== null && sessionOwnerId !== backendUser?.id;
+    const canGoLive          = allFilesReady && !isStreaming && !isGoingLive && !!folderSlug && !streamInUse;
 
     // ── Render ────────────────────────────────────────────────────────────────
     if (loading) {
@@ -692,7 +713,9 @@ export const PlayoutEngine: React.FC = () => {
                                 <div>
                                     <h2 className="text-xl font-bold text-ink">Stream Control</h2>
                                     <p className="text-xs text-inkLight">
-                                        {isStreaming ? 'Live — stream is active' : allFilesReady ? 'Ready to go live' : 'Normalizing clips...'}
+                                        {streamInUse
+                                            ? `In use by ${sessionOwnerUsername}`
+                                            : isStreaming ? 'Live — stream is active' : allFilesReady ? 'Ready to go live' : 'Normalizing clips...'}
                                     </p>
                                 </div>
                                 {isStreaming && (
@@ -702,6 +725,15 @@ export const PlayoutEngine: React.FC = () => {
                                     </span>
                                 )}
                             </div>
+
+                            {streamInUse && (
+                                <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-3 mb-4">
+                                    <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+                                    <p className="text-sm font-bold text-amber-600">
+                                        Stream currently in use by <span className="font-black">{sessionOwnerUsername}</span>. Controls are disabled.
+                                    </p>
+                                </div>
+                            )}
 
                             <div className="flex gap-3">
                                 <button
@@ -715,7 +747,7 @@ export const PlayoutEngine: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={handleStop}
-                                    disabled={!isStreaming || isStopping}
+                                    disabled={!isStreaming || isStopping || streamInUse}
                                     className="flex-1 py-3.5 bg-red-500/10 text-red-500 border border-red-500/30 font-black rounded-2xl hover:bg-red-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {isStopping

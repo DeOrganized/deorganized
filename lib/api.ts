@@ -197,6 +197,8 @@ export interface DCPEStatus {
     streaming_enabled: boolean;
     last_prep_at: string | null;
     last_error: string | null;
+    session_owner_id?: number | null;
+    session_owner_username?: string | null;
 }
 
 export interface DCPEPlaylist {
@@ -2357,6 +2359,13 @@ export const dcpeCreatorStreamStart = async (token: string): Promise<any> => {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
     });
+    if (resp.status === 409) {
+        const data = await resp.json();
+        const err: any = new Error(data.error || 'Stream in use by another creator');
+        err.status = 409;
+        err.session_owner_username = data.session_owner_username;
+        throw err;
+    }
     if (!resp.ok) throw new Error(`Stream start failed: ${resp.status}`);
     return resp.json();
 };
@@ -2366,7 +2375,23 @@ export const dcpeCreatorStreamStop = async (token: string): Promise<any> => {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
     });
+    if (resp.status === 403) {
+        const data = await resp.json();
+        const err: any = new Error(data.error || 'You do not own this stream session');
+        err.status = 403;
+        throw err;
+    }
     if (!resp.ok) throw new Error(`Stream stop failed: ${resp.status}`);
+    return resp.json();
+};
+
+export const adminDcpeKill = async (token: string): Promise<any> => {
+    const opsBaseUrl = API_BASE_URL.replace('/api', '') + '/ops';
+    const resp = await fetch(`${opsBaseUrl}/admin/dcpe/kill/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!resp.ok) throw new Error(`Admin kill failed: ${resp.status}`);
     return resp.json();
 };
 
