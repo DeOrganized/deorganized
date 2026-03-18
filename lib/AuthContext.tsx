@@ -168,9 +168,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.log('🔵 [AUTH] API Response:', { is_new: result.is_new, has_tokens: !!result.tokens, has_user: !!result.user });
 
             if (result.is_new) {
-                // New user - store wallet for setup and navigate to setup page
+                // New user — store wallet + signature so setup can prove ownership to the backend.
                 console.log('🟢 [AUTH] New user detected - navigating to setup');
                 storePendingWallet(userData.address);
+                if (signature) {
+                    sessionStorage.setItem('pending_sig', signature);
+                    sessionStorage.setItem('pending_msg', message);
+                }
                 onNewUser?.();
             } else {
                 // Existing user - store tokens and user data
@@ -211,9 +215,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setAuthError(null);
 
         try {
+            const pendingSig = sessionStorage.getItem('pending_sig') || undefined;
+            const pendingMsg = sessionStorage.getItem('pending_msg') || undefined;
+
             const result = await completeSetup({
                 ...payload,
                 wallet_address: walletAddress,
+                stacks_signature: pendingSig,
+                stacks_message: pendingMsg,
             });
 
             // Store tokens and user data
@@ -221,6 +230,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             storeUser(result.user);
             setAccessToken(result.tokens.access);
             setBackendUser(result.user);
+
+            // Clean up one-time setup credentials
+            sessionStorage.removeItem('pending_sig');
+            sessionStorage.removeItem('pending_msg');
 
             // Navigate to stored redirect URL, or role-based default
             const redirect = sessionStorage.getItem('setup_redirect');

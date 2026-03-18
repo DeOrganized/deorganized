@@ -50,6 +50,8 @@ export interface CompleteSetupPayload {
     twitter?: string;
     instagram?: string;
     youtube?: string;
+    stacks_signature?: string;
+    stacks_message?: string;
 }
 
 export interface CompleteSetupResponse {
