@@ -13,12 +13,23 @@ import {
     DAPStatus, DAPUser, DAPBalance, DAPTransaction, StacksWalletBalances,
     dcpeCreatorUpload, dcpeCreatorPrep, dcpeCreatorPrepStatus,
     dcpeCreatorSetPlaylist, dcpeCreatorStreamStart, dcpeCreatorStreamStop,
-    dcpeCreatorStatus, CreatorPrepFileStatus,
+    dcpeCreatorStatus, CreatorPrepFileStatus, InsufficientCreditsError,
 } from '../lib/api';
 
-const PLAYOUT_COST = 200;
+const UPLOAD_COST_PER_FILE = 100;  // DAP credits per video upload
 const MAX_FILES = 5;
+const MAX_DURATION_SECONDS = 180;  // 3 minutes
 const ACCEPTED_TYPES = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo', 'video/x-matroska'];
+
+const getVideoDuration = (file: File): Promise<number> =>
+    new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(video.duration); };
+        video.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read video metadata')); };
+        video.src = url;
+    });
 
 interface FileEntry {
     id: string;           // local temp id before upload
@@ -157,25 +168,55 @@ export const PlayoutEngine: React.FC = () => {
         setFiles(prev => prev.map(f => f.id === entry.id ? { ...f, status: 'uploading' } : f));
         try {
             const result = await dcpeCreatorUpload(entry.file, accessToken, currentSessionId || undefined);
-            const newSession = result.session_id;
             setFiles(prev => prev.map(f =>
                 f.id === entry.id
                     ? { ...f, status: 'uploaded', file_id: result.file_id }
                     : f
             ));
-            return { entry, newSessionId: newSession };
+            // Sync balance from response to avoid an extra round-trip
+            if (result.new_balance != null) {
+                setUserBalance(prev => prev ? { ...prev, balance: String(result.new_balance) } : prev);
+            }
+            return { entry, newSessionId: result.session_id };
         } catch (e: any) {
+            const msg = e instanceof InsufficientCreditsError
+                ? `Insufficient credits (have ${e.balance}, need ${UPLOAD_COST_PER_FILE})`
+                : e.message;
             setFiles(prev => prev.map(f =>
-                f.id === entry.id ? { ...f, status: 'error', error: e.message } : f
+                f.id === entry.id ? { ...f, status: 'error', error: msg } : f
             ));
             return { entry, newSessionId: currentSessionId };
         }
     };
 
     const handleFiles = useCallback(async (incoming: File[]) => {
-        const accepted = incoming
+        const candidates = incoming
             .filter(f => ACCEPTED_TYPES.includes(f.type) || f.name.match(/\.(mp4|mov|webm|mkv|avi)$/i))
             .slice(0, MAX_FILES - files.length);
+
+        if (!candidates.length) return;
+
+        // Validate duration for each file before queueing
+        const accepted: File[] = [];
+        for (const f of candidates) {
+            try {
+                const duration = await getVideoDuration(f);
+                if (duration > MAX_DURATION_SECONDS) {
+                    // Add as error entry so user sees the rejection
+                    setFiles(prev => [...prev, {
+                        id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+                        file: f,
+                        filename: f.name,
+                        status: 'error',
+                        error: `Too long (${Math.round(duration)}s — max 3 min)`,
+                    }]);
+                    continue;
+                }
+                accepted.push(f);
+            } catch {
+                accepted.push(f); // Can't read metadata — let server decide
+            }
+        }
 
         if (!accepted.length) return;
 
@@ -294,7 +335,7 @@ export const PlayoutEngine: React.FC = () => {
 
     // ── Derived state ─────────────────────────────────────────────────────────
     const balance            = parseFloat(userBalance?.balance || '0');
-    const hasEnoughCredits   = isRegistered && balance >= PLAYOUT_COST;
+    const hasEnoughCredits   = isRegistered && balance >= UPLOAD_COST_PER_FILE;
     const uploadedFiles      = files.filter(f => f.status === 'uploaded');
     const canPrep            = uploadedFiles.length > 0 && !isPrepping && prepJobStatus === 'idle';
     const allFilesReady      = prepJobStatus === 'ready';
@@ -357,8 +398,8 @@ export const PlayoutEngine: React.FC = () => {
                                 >
                                     <RefreshCw className={`w-4 h-4 text-inkLight ${isRefreshing ? 'animate-spin' : ''}`} />
                                 </button>
-                                <div className={`px-3 py-1.5 rounded-xl text-sm font-bold ${balance >= PLAYOUT_COST ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-500'}`}>
-                                    {balance >= PLAYOUT_COST ? `${PLAYOUT_COST} credits required ✓` : `Need ${PLAYOUT_COST} credits`}
+                                <div className={`px-3 py-1.5 rounded-xl text-sm font-bold ${balance >= UPLOAD_COST_PER_FILE ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-500'}`}>
+                                    {balance >= UPLOAD_COST_PER_FILE ? `${UPLOAD_COST_PER_FILE} cr/video ✓` : `Need ${UPLOAD_COST_PER_FILE} credits`}
                                 </div>
                             </div>
                         </div>
@@ -369,7 +410,7 @@ export const PlayoutEngine: React.FC = () => {
                             className="flex items-center gap-2 text-sm font-bold text-gold hover:text-gold/80 transition-colors"
                         >
                             {buyCreditsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                            {balance < PLAYOUT_COST ? 'Buy credits to get started' : 'Buy more credits'}
+                            {balance < UPLOAD_COST_PER_FILE ? 'Buy credits to get started' : 'Buy more credits'}
                         </button>
 
                         <AnimatePresence>
@@ -452,7 +493,7 @@ export const PlayoutEngine: React.FC = () => {
                 <div className="bg-surface border border-borderSubtle rounded-3xl p-8 text-center">
                     <AlertCircle className="w-10 h-10 text-gold mx-auto mb-3" />
                     <p className="font-bold text-ink mb-1">Insufficient credits</p>
-                    <p className="text-sm text-inkLight">You need at least {PLAYOUT_COST} DAP credits to use the Playout Engine.</p>
+                    <p className="text-sm text-inkLight">You need at least {UPLOAD_COST_PER_FILE} DAP credits to upload a video ({UPLOAD_COST_PER_FILE} credits per file).</p>
                 </div>
             ) : (
                 <>
@@ -464,7 +505,7 @@ export const PlayoutEngine: React.FC = () => {
                             </div>
                             <div>
                                 <h2 className="text-xl font-bold text-ink">Upload Clips</h2>
-                                <p className="text-xs text-inkLight">Max {MAX_FILES} files · MP4, MOV, WebM</p>
+                                <p className="text-xs text-inkLight">Max {MAX_FILES} files · 3 min max · {UPLOAD_COST_PER_FILE} credits per file · MP4, MOV, WebM</p>
                             </div>
                         </div>
 
@@ -524,15 +565,35 @@ export const PlayoutEngine: React.FC = () => {
                             </div>
                         )}
 
-                        {/* Prepare button */}
+                        {/* Cost summary + Prepare button */}
                         {files.length > 0 && (
-                            <button
-                                onClick={handlePrep}
-                                disabled={!canPrep}
-                                className="w-full py-3 bg-gold text-canvas font-black rounded-2xl hover:bg-gold/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            >
-                                {isPrepping ? <><Loader2 className="w-4 h-4 animate-spin" /> Normalizing...</> : 'Prepare Clips'}
-                            </button>
+                            <>
+                                {(() => {
+                                    const pendingCount = files.filter(f => f.status === 'pending').length;
+                                    const uploadedCount = files.filter(f => f.status === 'uploaded').length;
+                                    const totalCost = (pendingCount + uploadedCount) * UPLOAD_COST_PER_FILE;
+                                    const pending = pendingCount > 0;
+                                    return (
+                                        <div className="flex items-center justify-between text-xs px-1">
+                                            <span className="text-inkLight">
+                                                {pending
+                                                    ? `${pendingCount} file${pendingCount !== 1 ? 's' : ''} queued · uploading now`
+                                                    : `${uploadedCount} file${uploadedCount !== 1 ? 's' : ''} ready`}
+                                            </span>
+                                            <span className={`font-black ${balance >= totalCost ? 'text-green-600' : 'text-red-500'}`}>
+                                                −{totalCost} credits
+                                            </span>
+                                        </div>
+                                    );
+                                })()}
+                                <button
+                                    onClick={handlePrep}
+                                    disabled={!canPrep}
+                                    className="w-full py-3 bg-gold text-canvas font-black rounded-2xl hover:bg-gold/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {isPrepping ? <><Loader2 className="w-4 h-4 animate-spin" /> Normalizing...</> : 'Prepare Clips'}
+                                </button>
+                            </>
                         )}
 
                         {prepError && (

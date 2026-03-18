@@ -2253,6 +2253,19 @@ export interface CreatorUploadResult {
     session_id: string;
     filename: string;
     status: 'uploaded';
+    credits_deducted?: number;
+    new_balance?: number;
+}
+
+export class InsufficientCreditsError extends Error {
+    balance: number;
+    required: number;
+    constructor(balance: number, required: number) {
+        super(`Insufficient DAP credits. Have ${balance}, need ${required}.`);
+        this.name = 'InsufficientCreditsError';
+        this.balance = balance;
+        this.required = required;
+    }
 }
 
 export interface CreatorPrepResult {
@@ -2288,6 +2301,10 @@ export const dcpeCreatorUpload = async (
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
     });
+    if (resp.status === 402) {
+        const err = await resp.json().catch(() => ({}));
+        throw new InsufficientCreditsError(err.balance ?? 0, err.required ?? 100);
+    }
     if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         throw new Error(err.error || `Upload failed: ${resp.status}`);
