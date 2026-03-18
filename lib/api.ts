@@ -2244,6 +2244,123 @@ export const dcpeSetPlaylistOrder = async (folders: string[], token: string): Pr
     if (!resp.ok) throw new Error('Failed to set playlist order');
     return resp.json();
 };
+// --- Creator Studio DCPE API ---
+
+const dcpeCreatorBase = () => `${API_BASE_URL.replace('/api', '')}/ops/dcpe`;
+
+export interface CreatorUploadResult {
+    file_id: string;
+    session_id: string;
+    filename: string;
+    status: 'uploaded';
+}
+
+export interface CreatorPrepResult {
+    prep_id: string;
+    folder_slug: string;
+    status: 'processing';
+}
+
+export interface CreatorPrepFileStatus {
+    file_id: string;
+    filename: string;
+    status: 'queued' | 'normalizing' | 'ready' | 'error';
+    error?: string;
+}
+
+export interface CreatorPrepStatus {
+    prep_id: string;
+    status: 'processing' | 'ready' | 'partial' | 'error';
+    folder_slug: string;
+    files: CreatorPrepFileStatus[];
+}
+
+export const dcpeCreatorUpload = async (
+    file: File,
+    token: string,
+    sessionId?: string
+): Promise<CreatorUploadResult> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (sessionId) formData.append('session_id', sessionId);
+    const resp = await fetch(`${dcpeCreatorBase()}/upload/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+    });
+    if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || `Upload failed: ${resp.status}`);
+    }
+    return resp.json();
+};
+
+export const dcpeCreatorPrep = async (
+    fileIds: string[],
+    token: string
+): Promise<CreatorPrepResult> => {
+    const resp = await fetch(`${dcpeCreatorBase()}/prep/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_ids: fileIds }),
+    });
+    if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || `Prep failed: ${resp.status}`);
+    }
+    return resp.json();
+};
+
+export const dcpeCreatorPrepStatus = async (
+    prepId: string,
+    token: string
+): Promise<CreatorPrepStatus> => {
+    const resp = await fetch(`${dcpeCreatorBase()}/prep-status/${prepId}/`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!resp.ok) throw new Error(`Prep status fetch failed: ${resp.status}`);
+    return resp.json();
+};
+
+export const dcpeCreatorSetPlaylist = async (
+    playlistId: string,
+    token: string
+): Promise<any> => {
+    const resp = await fetch(`${dcpeCreatorBase()}/set-playlist/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playlist_id: playlistId }),
+    });
+    if (!resp.ok) throw new Error(`Set playlist failed: ${resp.status}`);
+    return resp.json();
+};
+
+export const dcpeCreatorStreamStart = async (token: string): Promise<any> => {
+    const resp = await fetch(`${dcpeCreatorBase()}/stream-start/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!resp.ok) throw new Error(`Stream start failed: ${resp.status}`);
+    return resp.json();
+};
+
+export const dcpeCreatorStreamStop = async (token: string): Promise<any> => {
+    const resp = await fetch(`${dcpeCreatorBase()}/stream-stop/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!resp.ok) throw new Error(`Stream stop failed: ${resp.status}`);
+    return resp.json();
+};
+
+export const dcpeCreatorStatus = async (token: string): Promise<DCPEStatus> => {
+    const resp = await fetch(`${dcpeCreatorBase()}/status/`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!resp.ok) throw new Error(`Status fetch failed: ${resp.status}`);
+    return resp.json();
+};
+
 // --- RTMP Destinations API ---
 
 export const fetchRTMPDestinations = async (token: string): Promise<RTMPDestination[]> => {
