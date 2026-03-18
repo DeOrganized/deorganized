@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     Wallet, Tv, Upload, CheckCircle, XCircle, Loader2,
     Radio, Square, RefreshCw, ChevronDown, ChevronUp, Film,
-    AlertCircle, Play
+    AlertCircle, Play, Plus, Zap, Clock, Check, Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { request } from '@stacks/connect';
@@ -55,6 +55,8 @@ export const PlayoutEngine: React.FC = () => {
     const [stxAmount, setStxAmount]         = useState('1');
     const [depositPending, setDepositPending] = useState(false);
     const [copiedAddress, setCopiedAddress] = useState(false);
+    const [copiedMemo, setCopiedMemo]       = useState(false);
+    const [advancedOpen, setAdvancedOpen]   = useState(false);
     const [txHistoryOpen, setTxHistoryOpen] = useState(false);
 
     // ── Upload state ─────────────────────────────────────────────────────────
@@ -315,6 +317,12 @@ export const PlayoutEngine: React.FC = () => {
     };
 
     // ── DAP buy credits ───────────────────────────────────────────────────────
+    const copyToClipboard = (text: string, setter: (v: boolean) => void) => {
+        navigator.clipboard.writeText(text);
+        setter(true);
+        setTimeout(() => setter(false), 2000);
+    };
+
     const handleBuyCredits = async () => {
         if (!dapStatus || !userInfo || depositPending) return;
         const microStx = Math.round(parseFloat(stxAmount) * 1_000_000);
@@ -384,81 +392,152 @@ export const PlayoutEngine: React.FC = () => {
                     )
                 ) : (
                     <div className="space-y-4">
-                        {/* Balance row */}
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-3xl font-black text-ink">{balance.toLocaleString()}</p>
-                                <p className="text-xs text-inkLight">credits available</p>
+                        {/* Stacks Wallet Token Balances */}
+                        {walletBalances && (
+                            <div className="grid grid-cols-3 gap-3">
+                                {([
+                                    { label: 'STX',   value: walletBalances.stx },
+                                    { label: 'sBTC',  value: walletBalances.sbtc },
+                                    { label: 'USDCx', value: walletBalances.usdcx },
+                                ] as const).map(({ label, value }) => (
+                                    <div key={label} className="bg-surface rounded-2xl p-4 text-center">
+                                        <p className="text-xs font-black text-inkLight uppercase tracking-widest mb-1">{label}</p>
+                                        <p className="text-lg font-black text-ink">{value}</p>
+                                    </div>
+                                ))}
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => backendUser?.stacks_address && refreshBalance(backendUser.stacks_address)}
-                                    disabled={isRefreshing}
-                                    className="p-2 hover:bg-surface rounded-xl transition-colors"
-                                >
-                                    <RefreshCw className={`w-4 h-4 text-inkLight ${isRefreshing ? 'animate-spin' : ''}`} />
-                                </button>
-                                <div className={`px-3 py-1.5 rounded-xl text-sm font-bold ${balance >= UPLOAD_COST_PER_FILE ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-500'}`}>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Credit Balance */}
+                            <div className="bg-surface rounded-2xl p-5">
+                                <p className="text-xs font-bold text-inkLight uppercase tracking-widest mb-2">Credit Balance</p>
+                                <div className="text-5xl font-black text-gold mb-1">
+                                    {balance.toLocaleString()}
+                                </div>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <p className="text-xs text-inkLight">credits available</p>
+                                    <button
+                                        onClick={() => userInfo && refreshBalance(userInfo.stacks_address)}
+                                        disabled={isRefreshing}
+                                        className="text-inkLight hover:text-gold transition-colors disabled:cursor-not-allowed"
+                                        aria-label="Refresh balance"
+                                    >
+                                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-gold' : ''}`} />
+                                    </button>
+                                </div>
+                                <div className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${balance >= UPLOAD_COST_PER_FILE ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-500'}`}>
                                     {balance >= UPLOAD_COST_PER_FILE ? `${UPLOAD_COST_PER_FILE} cr/video ✓` : `Need ${UPLOAD_COST_PER_FILE} credits`}
                                 </div>
                             </div>
+
+                            {/* Buy Credits */}
+                            {dapStatus && userInfo && (
+                                <div className="bg-surface rounded-2xl p-5 space-y-4">
+                                    <p className="text-xs font-bold text-inkLight uppercase tracking-widest">Buy Credits</p>
+
+                                    {depositPending ? (
+                                        <div className="flex items-start gap-3 bg-gold/10 border border-gold/30 rounded-xl px-4 py-3">
+                                            <Clock className="w-4 h-4 text-gold shrink-0 mt-0.5" />
+                                            <div>
+                                                <p className="text-sm font-bold text-ink">Deposit pending</p>
+                                                <p className="text-xs text-inkLight mt-0.5">Credits will appear within ~1 minute once the DAP watcher picks up your transaction.</p>
+                                                <button
+                                                    onClick={() => { setDepositPending(false); userInfo && refreshBalance(userInfo.stacks_address); }}
+                                                    disabled={isRefreshing}
+                                                    className="mt-2 flex items-center gap-1.5 text-xs font-bold text-gold hover:underline disabled:opacity-50"
+                                                >
+                                                    <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                                    Refresh balance
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : buyCreditsOpen ? (
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="text-xs text-inkLight mb-1 block">STX amount</label>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="number"
+                                                        min="0.000001"
+                                                        step="1"
+                                                        value={stxAmount}
+                                                        onChange={e => setStxAmount(e.target.value)}
+                                                        className="flex-1 bg-canvas border border-borderSubtle rounded-xl px-3 py-2 text-sm font-bold text-ink focus:outline-none focus:border-gold/60"
+                                                    />
+                                                    <span className="text-xs font-bold text-inkLight shrink-0">STX</span>
+                                                </div>
+                                                <p className="text-xs text-inkLight mt-1.5">
+                                                    = <span className="font-bold text-gold">
+                                                        {Math.round((parseFloat(stxAmount) || 0) * dapStatus.credit_rate).toLocaleString()} credits
+                                                    </span>
+                                                    <span className="ml-2 text-inkLight/60">({dapStatus.credit_rate} credits / STX)</span>
+                                                </p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={handleBuyCredits}
+                                                    disabled={!parseFloat(stxAmount) || parseFloat(stxAmount) <= 0}
+                                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gold-gradient text-white text-sm font-bold rounded-xl shadow-md shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
+                                                >
+                                                    <Zap className="w-4 h-4" />
+                                                    Buy with Wallet
+                                                </button>
+                                                <button
+                                                    onClick={() => setBuyCreditsOpen(false)}
+                                                    className="px-4 py-2.5 text-sm font-bold text-inkLight hover:text-ink border border-borderSubtle rounded-xl transition-colors"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => setBuyCreditsOpen(true)}
+                                            className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gold/40 rounded-xl text-sm font-bold text-gold hover:border-gold hover:bg-gold/5 transition-all"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            Buy Credits
+                                        </button>
+                                    )}
+
+                                    {/* Advanced: deposit from external wallet */}
+                                    <div className="border-t border-borderSubtle pt-3">
+                                        <button
+                                            onClick={() => setAdvancedOpen(v => !v)}
+                                            className="flex items-center gap-1.5 text-xs text-inkLight hover:text-ink transition-colors"
+                                        >
+                                            {advancedOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                            Advanced: deposit from external wallet
+                                        </button>
+                                        {advancedOpen && (
+                                            <div className="mt-3 space-y-2">
+                                                <div>
+                                                    <p className="text-xs text-inkLight mb-1">Deposit Address</p>
+                                                    <div className="flex items-center gap-2 bg-canvas border border-borderSubtle rounded-xl px-3 py-2">
+                                                        <span className="text-xs font-mono text-ink flex-1 truncate">{dapStatus.deposit_address}</span>
+                                                        <button onClick={() => copyToClipboard(dapStatus.deposit_address, setCopiedAddress)}>
+                                                            {copiedAddress ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-inkLight hover:text-gold transition-colors" />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-inkLight mb-1">Your Memo Code <span className="text-red-500">(required)</span></p>
+                                                    <div className="flex items-center gap-2 bg-canvas border border-borderSubtle rounded-xl px-3 py-2">
+                                                        <span className="text-xs font-mono font-bold text-gold flex-1">{userInfo.memo_code}</span>
+                                                        <button onClick={() => copyToClipboard(userInfo.memo_code, setCopiedMemo)}>
+                                                            {copiedMemo ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-inkLight hover:text-gold transition-colors" />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Buy credits */}
-                        <button
-                            onClick={() => setBuyCreditsOpen(o => !o)}
-                            className="flex items-center gap-2 text-sm font-bold text-gold hover:text-gold/80 transition-colors"
-                        >
-                            {buyCreditsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                            {balance < UPLOAD_COST_PER_FILE ? 'Buy credits to get started' : 'Buy more credits'}
-                        </button>
-
-                        <AnimatePresence>
-                            {buyCreditsOpen && dapStatus && (
-                                <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    className="overflow-hidden"
-                                >
-                                    <div className="bg-surface rounded-2xl p-4 space-y-3 border border-borderSubtle">
-                                        <p className="text-xs text-inkLight">
-                                            Send STX to earn credits. Rate: <span className="font-bold text-ink">{dapStatus.credit_rate} credits / STX</span>
-                                        </p>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="number"
-                                                value={stxAmount}
-                                                onChange={e => setStxAmount(e.target.value)}
-                                                min="0.01"
-                                                step="0.1"
-                                                className="flex-1 bg-canvas border border-borderSubtle rounded-xl px-3 py-2 text-sm"
-                                                placeholder="STX amount"
-                                            />
-                                            <button
-                                                onClick={handleBuyCredits}
-                                                disabled={depositPending}
-                                                className="px-4 py-2 bg-gold text-canvas text-sm font-bold rounded-xl hover:bg-gold/90 transition-colors disabled:opacity-50"
-                                            >
-                                                {depositPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send'}
-                                            </button>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-xs font-mono text-inkLight truncate flex-1">{dapStatus.deposit_address}</p>
-                                            <button
-                                                onClick={() => { navigator.clipboard.writeText(dapStatus.deposit_address); setCopiedAddress(true); setTimeout(() => setCopiedAddress(false), 2000); }}
-                                                className="text-xs text-gold font-bold shrink-0"
-                                            >
-                                                {copiedAddress ? 'Copied!' : 'Copy'}
-                                            </button>
-                                        </div>
-                                        <p className="text-[10px] text-inkLight/70">Credits appear within ~1 min after transaction confirms.</p>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* Tx history toggle */}
+                        {/* Tx history */}
                         {transactions.length > 0 && (
                             <button
                                 onClick={() => setTxHistoryOpen(o => !o)}
