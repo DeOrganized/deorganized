@@ -64,6 +64,7 @@ export async function agentX402Fetch(
   const broadcastUrl = config.network === 'mainnet'
     ? 'https://stacks-node-api.mainnet.stacks.co'
     : 'https://api.testnet.hiro.so';
+  void broadcastUrl; // retained for potential future use — not used by broadcastTransaction()
 
   // Step 1 — Make the initial request
   console.log(`[Agent] → ${init.method || 'GET'} ${url}`);
@@ -132,6 +133,8 @@ export async function agentX402Fetch(
       throw new Error(`[Agent] Broadcast failed: ${JSON.stringify(result)}`);
     }
     txId = typeof result === 'string' ? result : result.txid;
+  } else {
+    throw new Error(`[Agent] Unsupported token type: ${config.tokenType}`);
   }
 
   console.log(`[Agent] ✅ Transaction broadcast: ${txId}`);

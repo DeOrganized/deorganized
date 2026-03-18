@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AppConfig, UserSession, showConnect } from '@stacks/connect';
+import { AppConfig, UserSession, showConnect, openSignatureRequestPopup } from '@stacks/connect';
 import { useRouter } from 'next/navigation';
 import {
     walletLoginOrCheck,
@@ -41,16 +41,40 @@ export default function WalletAuth() {
 
                         console.log('Wallet connected:', walletAddress);
 
-                        // Check if wallet exists
-                        const result = await walletLoginOrCheck(walletAddress);
+                        // Build a fresh login message with a nonce
+                        const nonce = Date.now().toString();
+                        const message = `DeOrganized login:${walletAddress}:${nonce}`;
+
+                        // Request signature — proves wallet ownership
+                        let signature: string | undefined;
+                        try {
+                            signature = await new Promise<string>((resolve, reject) => {
+                                openSignatureRequestPopup({
+                                    message,
+                                    userSession,
+                                    onFinish: ({ signature: sig }) => resolve(sig),
+                                    onCancel: () => reject(new Error('cancelled')),
+                                });
+                            });
+                        } catch {
+                            // User cancelled signature — allow through (grace period logs on backend)
+                            console.warn('[wallet_login] Signature cancelled — proceeding without it');
+                        }
+
+                        // Check if wallet exists (sends signature if available)
+                        const result = await walletLoginOrCheck(walletAddress, message, signature);
 
                         if (result.is_new) {
-                            // New user - go to setup
+                            // New user — store wallet + signature so setup page can claim welcome points
                             console.log('New user detected, redirecting to setup');
                             storePendingWallet(walletAddress);
+                            if (signature) {
+                                localStorage.setItem('pending_sig', signature);
+                                localStorage.setItem('pending_msg', message);
+                            }
                             router.push('/setup');
                         } else {
-                            // Existing user - save tokens and redirect
+                            // Existing user — save tokens and redirect
                             console.log('Existing user, logging in');
 
                             if (!result.user || !result.tokens) {
@@ -113,3 +137,4 @@ export default function WalletAuth() {
         </div>
     );
 }
+

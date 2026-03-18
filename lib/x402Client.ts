@@ -198,6 +198,8 @@ export async function x402Fetch(
           onCancel: () => reject(new PaymentCancelledError()),
         });
       });
+    } else {
+      throw new PaymentFailedError(`Unsupported token type: ${tokenType}`);
     }
   } catch (err) {
     if (err instanceof PaymentCancelledError) throw err;

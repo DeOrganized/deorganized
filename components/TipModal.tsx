@@ -92,7 +92,7 @@ const TipModal: React.FC<TipModalProps> = ({ creatorId, onClose }) => {
 
                     {txId && (
                         <a
-                            href={`https://explorer.hiro.so/txid/${txId}?chain=mainnnet`}
+                            href={`https://explorer.hiro.so/txid/${txId}?chain=mainnet`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center justify-center gap-2 text-gold hover:text-gold/80 transition-colors text-xs font-bold mb-6"

@@ -1,10 +1,13 @@
 /**
  * Wallet Authentication API Client
- * 
- * Simple address-based auth - NO signatures, NO nonces
+ *
+ * Stacks wallet-based auth with message signature verification.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL =
+    (import.meta as any).env?.VITE_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    'http://localhost:8000/api';
 
 export interface User {
     id: number;
@@ -16,6 +19,9 @@ export interface User {
     website?: string;
     is_verified: boolean;
     date_joined: string;
+    // DAPP Points
+    dapp_points?: number;
+    wallet_verified?: boolean;
 }
 
 export interface AuthTokens {
@@ -35,6 +41,9 @@ export interface CompleteSetupRequest {
     username?: string;
     bio?: string;
     website?: string;
+    // Stacks wallet ownership proof (optional — awards 10 DAPP welcome points if provided)
+    stacks_signature?: string;
+    stacks_message?: string;
 }
 
 export interface CompleteSetupResponse {
@@ -43,19 +52,22 @@ export interface CompleteSetupResponse {
 }
 
 /**
- * Check if wallet exists and login if it does
+ * Check if wallet exists and login if it does.
+ * Sends a Stacks signature so the backend can verify wallet ownership.
  */
 export async function walletLoginOrCheck(
-    walletAddress: string
+    walletAddress: string,
+    message?: string,
+    signature?: string,
 ): Promise<LoginCheckResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/users/wallet-login-or-check/`, {
+    const body: Record<string, string> = { wallet_address: walletAddress };
+    if (message)   body.message   = message;
+    if (signature) body.signature = signature;
+
+    const response = await fetch(`${API_BASE_URL}/users/wallet-login-or-check/`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            wallet_address: walletAddress,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -67,16 +79,15 @@ export async function walletLoginOrCheck(
 }
 
 /**
- * Complete user setup and create account
+ * Complete user setup and create account.
+ * Pass stacks_signature + stacks_message to earn 10 DAPP welcome points.
  */
 export async function completeSetup(
     data: CompleteSetupRequest
 ): Promise<CompleteSetupResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/users/complete-setup/`, {
+    const response = await fetch(`${API_BASE_URL}/users/complete-setup/`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
     });
 
@@ -87,6 +98,7 @@ export async function completeSetup(
 
     return response.json();
 }
+
 
 /**
  * Store auth tokens in localStorage
