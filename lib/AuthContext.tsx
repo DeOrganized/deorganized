@@ -152,6 +152,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // Build a nonce-bearing message so each login attempt is unique.
             const nonce = Date.now().toString();
             const message = `DeOrganized login:${userData.address}:${nonce}`;
+            console.log('🔵 [AUTH] Message to sign:', message);
 
             let signature: string;
             try {
@@ -159,6 +160,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (!sigResult?.signature) throw new Error('No signature returned');
                 signature = sigResult.signature as string;
                 console.log('✅ [AUTH] Wallet signature obtained');
+                console.log('🔵 [AUTH] Signature prefix (first 40 chars):', signature.substring(0, 40));
+                console.log('🔵 [AUTH] Signature length:', signature.length);
+                console.log('🔵 [AUTH] Full sigResult keys:', Object.keys(sigResult));
             } catch {
                 // User cancelled the signature prompt — do not proceed to backend.
                 console.warn('⚠️ [AUTH] Signature cancelled');
@@ -166,6 +170,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 return;
             }
 
+            console.log('🔵 [AUTH] POST body to wallet-login-or-check:', {
+                wallet_address: userData.address,
+                message,
+                signature_prefix: signature.substring(0, 40) + '...',
+                signature_length: signature.length,
+            });
             const result = await checkWalletOrLogin(userData.address, message, signature);
             console.log('🔵 [AUTH] API Response:', { is_new: result.is_new, has_tokens: !!result.tokens, has_user: !!result.user });
 
