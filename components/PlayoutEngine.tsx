@@ -109,13 +109,11 @@ export const PlayoutEngine: React.FC = () => {
                 if (dcpeState) setIsStreaming(!!dcpeState.rtmp_connected && !!dcpeState.streaming_enabled);
 
                 const addr = backendUser.stacks_address;
-                if (addr && status) {
-                    try {
-                        const reg = await registerDAP(accessToken, addr);
-                        setUserInfo(reg);
-                        setIsRegistered(true);
-                        await refreshBalance(addr);
-                    } catch { setIsRegistered(false); }
+                if (addr) {
+                    const reg = await registerDAP(accessToken, addr);
+                    setUserInfo(reg);
+                    setIsRegistered(true);
+                    await refreshBalance(addr);
                 }
             } catch (e) {
                 console.error('[PlayoutEngine] init failed:', e);
@@ -126,7 +124,7 @@ export const PlayoutEngine: React.FC = () => {
         init();
         return () => stopPolling();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [accessToken, backendUser?.id]);
+    }, [accessToken, backendUser]);
 
     // ── Prep polling ──────────────────────────────────────────────────────────
     useEffect(() => {
