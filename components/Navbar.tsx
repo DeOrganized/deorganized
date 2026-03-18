@@ -26,6 +26,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
     backendUser,
     logout,
     isAuthenticating,
+    authError,
     handleWalletConnect,
     accessToken
   } = useAuth();
@@ -46,19 +47,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
 
 
     // Only proceed if:
-    // 1. Wallet is connected
-    // 2. We have an address
-    // 3. User is not already authenticated
-    // 4. Not currently authenticating
-    // 5. We haven't already checked this specific wallet address
-    // 6. We're not already on the register page (prevents loop)
+    // 1. Wallet is connected with an address
+    // 2. User is not already backend-authenticated
+    // 3. We haven't already checked this specific wallet address (prevents double-calls)
+    // 4. We're not already on the register page (prevents re-triggering setup flow)
+    // Note: isAuthenticating is intentionally NOT checked here. connectWallet sets
+    // isAuthenticating = true before signIn() resolves, so the effect must fire
+    // even when isAuthenticating is true. walletCheckAttempted is the correct guard.
     if (
       isWalletConnected &&
       walletAddress &&
       !isBackendAuthenticated &&
-      !isAuthenticating &&
       walletCheckAttempted.current !== walletAddress &&
-      currentPage !== 'register'  // KEY FIX: Don't re-check if already on register page
+      currentPage !== 'register'
     ) {
 
       // Mark this wallet as checked
@@ -233,7 +234,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 Logout
               </button>
             </>
-          ) : isWalletConnected && walletAddress ? (
+          ) : isWalletConnected && walletAddress && !isAuthenticating && !authError ? (
             <>
               {/* Wallet connected but not registered */}
               <div className="flex items-center gap-2 px-4 py-2 bg-surface border border-borderSubtle rounded-full">
@@ -307,7 +308,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 Logout
               </button>
             </>
-          ) : isWalletConnected ? (
+          ) : isWalletConnected && !isAuthenticating && !authError ? (
             <button
               onClick={() => handleNavClick('register')}
               className="bg-gold hover:bg-gold/90 text-white px-6 py-3 rounded-full text-lg font-semibold"

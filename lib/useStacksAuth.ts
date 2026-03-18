@@ -9,7 +9,7 @@ interface UserData {
 interface UseStacksAuthReturn {
     isAuthenticated: boolean;
     userData: UserData | null;
-    signIn: () => void;
+    signIn: () => Promise<void>;
     signOut: () => void;
 }
 
@@ -31,12 +31,11 @@ export const useStacksAuth = (): UseStacksAuthReturn => {
         return undefined;
     };
 
-    // Load existing connection on mount
+    // Load existing connection on mount (returning users)
     useEffect(() => {
         const checkConnection = async () => {
-            const connected = await isConnected();
-
-            if (connected) {
+            // isConnected() is synchronous in @stacks/connect v8
+            if (isConnected()) {
                 const localData = getLocalStorage();
 
                 if (localData?.addresses?.stx?.[0]?.address) {
@@ -52,53 +51,27 @@ export const useStacksAuth = (): UseStacksAuthReturn => {
         checkConnection();
     }, []);
 
-    // Sign in with wallet
-    const signIn = () => {
-        // @ts-ignore - connect options type mismatch but works at runtime
-        connect({
+    // Sign in with wallet using the v8 Promise-based API.
+    // connect() resolves after the user approves in the wallet selector —
+    // no reload, no polling, no setTimeout needed.
+    const signIn = async (): Promise<void> => {
+        await connect({
             appDetails: {
                 name: 'Deorganized',
                 icon: window.location.origin + '/logo.png',
             },
-            onFinish: async () => {
-                const localData = getLocalStorage();
-
-                if (localData?.addresses?.stx?.[0]?.address) {
-                    const address = localData.addresses.stx[0].address;
-                    const bnsName = await fetchBNSName(address);
-
-                    setUserData({ address, bnsName });
-                    setIsAuthenticated(true);
-
-                    // Reload to update UI
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 500);
-                }
-            },
-            onCancel: () => {
-                // User cancelled
-            },
         });
 
-        // WORKAROUND: onFinish callback doesn't always fire reliably  
-        // Poll to detect when connection completes
-        let pollCount = 0;
-        const maxPolls = 50; // Poll for up to 25 seconds
+        // connect() resolved — address is synchronously available in localStorage
+        const localData = getLocalStorage();
 
-        const pollInterval = setInterval(async () => {
-            pollCount++;
+        if (localData?.addresses?.stx?.[0]?.address) {
+            const address = localData.addresses.stx[0].address;
+            const bnsName = await fetchBNSName(address);
 
-            const connected = await isConnected();
-            const localData = getLocalStorage();
-
-            if (connected && localData?.addresses?.stx?.[0]?.address && !isAuthenticated) {
-                clearInterval(pollInterval);
-                window.location.reload();
-            } else if (pollCount >= maxPolls) {
-                clearInterval(pollInterval);
-            }
-        }, 500); // Poll every 500ms
+            setUserData({ address, bnsName });
+            setIsAuthenticated(true);
+        }
     };
 
     // Sign out

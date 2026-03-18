@@ -153,15 +153,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const nonce = Date.now().toString();
             const message = `DeOrganized login:${userData.address}:${nonce}`;
 
-            let signature: string | undefined;
+            let signature: string;
             try {
                 const sigResult = await request('stx_signMessage', { message });
-                signature = sigResult?.signature as string | undefined;
+                if (!sigResult?.signature) throw new Error('No signature returned');
+                signature = sigResult.signature as string;
                 console.log('✅ [AUTH] Wallet signature obtained');
             } catch {
-                // User cancelled or wallet doesn't support signing — backend will log a warning
-                // and allow through during the grace period.
-                console.warn('⚠️ [AUTH] Signature cancelled or unavailable — proceeding without it');
+                // User cancelled the signature prompt — do not proceed to backend.
+                console.warn('⚠️ [AUTH] Signature cancelled');
+                setAuthError('Signature required to log in. Please try again.');
+                return;
             }
 
             const result = await checkWalletOrLogin(userData.address, message, signature);
@@ -288,11 +290,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
+    const connectWallet = useCallback(async () => {
+        setIsAuthenticating(true);
+        setAuthError(null);
+        try {
+            await signIn();
+            // signIn() resolved: isWalletConnected = true, walletAddress = set.
+            // Navbar useEffect will now trigger handleWalletConnect.
+        } catch {
+            // User dismissed the wallet selector — reset to initial state.
+            setIsAuthenticating(false);
+        }
+    }, [signIn]);
+
     const value: AuthContextType = {
         isWalletConnected,
         walletAddress: userData?.address || null,
         bnsName: userData?.bnsName || null,
-        connectWallet: signIn,
+        connectWallet,
         disconnectWallet: signOut,
 
         isBackendAuthenticated: !!backendUser && !!accessToken,
