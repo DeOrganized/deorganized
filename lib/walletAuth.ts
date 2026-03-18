@@ -70,15 +70,21 @@ export interface CompleteSetupResponse {
  * @returns WalletCheckResponse with is_new flag and optional user/tokens
  */
 export async function checkWalletOrLogin(
-    walletAddress: string
+    walletAddress: string,
+    message?: string,
+    signature?: string,
 ): Promise<WalletCheckResponse> {
     try {
+        const body: Record<string, string> = { wallet_address: walletAddress };
+        if (message)   body.message   = message;
+        if (signature) body.signature = signature;
+
         const response = await fetch(`${API_BASE_URL}/users/wallet-login-or-check/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ wallet_address: walletAddress }),
+            body: JSON.stringify(body),
         });
 
         if (!response.ok) {

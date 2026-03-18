@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { request } from '@stacks/connect';
 import { useStacksAuth } from './useStacksAuth';
 import {
     checkWalletOrLogin,
@@ -147,7 +148,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log('🔵 [AUTH] Starting wallet authentication for:', userData.address);
 
         try {
-            const result = await checkWalletOrLogin(userData.address);
+            // Request a wallet signature to prove ownership before hitting the backend.
+            // Build a nonce-bearing message so each login attempt is unique.
+            const nonce = Date.now().toString();
+            const message = `DeOrganized login:${userData.address}:${nonce}`;
+
+            let signature: string | undefined;
+            try {
+                const sigResult = await request('stx_signMessage', { message });
+                signature = sigResult?.signature as string | undefined;
+                console.log('✅ [AUTH] Wallet signature obtained');
+            } catch {
+                // User cancelled or wallet doesn't support signing — backend will log a warning
+                // and allow through during the grace period.
+                console.warn('⚠️ [AUTH] Signature cancelled or unavailable — proceeding without it');
+            }
+
+            const result = await checkWalletOrLogin(userData.address, message, signature);
             console.log('🔵 [AUTH] API Response:', { is_new: result.is_new, has_tokens: !!result.tokens, has_user: !!result.user });
 
             if (result.is_new) {
