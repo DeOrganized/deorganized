@@ -2729,6 +2729,24 @@ export const adminDapGrant = async (
     return res.json();
 };
 
+export const adminDapDeduct = async (
+    token: string,
+    stacks_address: string,
+    amount: number,
+    description: string,
+): Promise<{ success: boolean; new_balance: number | null; amount: number; description: string }> => {
+    const res = await fetch(`${API_BASE_URL}/admin/dap/deduct/`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stacks_address, amount, description }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).error || 'Deduct failed');
+    }
+    return res.json();
+};
+
 export interface DapNotification {
     id: number;
     action: string;

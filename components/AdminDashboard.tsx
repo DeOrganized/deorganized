@@ -5,10 +5,10 @@ import {
     UserPlus, TrendingUp, Shield, CheckCircle, XCircle,
     Search, ChevronLeft, ChevronRight, AlertCircle,
     BarChart3, Eye, Clock, Filter, RefreshCw, Star,
-    ShoppingBag, Send, Zap, Settings, Layout, Globe, Bot, X, ExternalLink
+    ShoppingBag, Send, Zap, Settings, Layout, Globe, Bot, X, ExternalLink, Minus
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
-import { API_BASE_URL, adminDapGrant } from '../lib/api';
+import { API_BASE_URL, adminDapGrant, adminDapDeduct } from '../lib/api';
 import { getValidAccessToken } from '../lib/walletAuth';
 import { MerchTracker } from './CreatorDashboard/MerchTracker';
 import { CommunityPosts } from './CreatorDashboard/CommunityPosts';
@@ -236,10 +236,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     const [permActive, setPermActive] = useState(true);
     const [permSaving, setPermSaving] = useState(false);
 
-    // Grant DAP state (inside permissions modal)
+    // Grant / Deduct DAP state (inside permissions modal)
     const [grantAmount, setGrantAmount] = useState('');
     const [grantDescription, setGrantDescription] = useState('');
     const [grantSaving, setGrantSaving] = useState(false);
+    const [deductSaving, setDeductSaving] = useState(false);
+    const [zeroOutSaving, setZeroOutSaving] = useState(false);
 
     const openPermissionsModal = (user: AdminUser) => {
         setManagingUser(user);
@@ -286,6 +288,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
             toast.error(e.message || 'Grant failed');
         } finally {
             setGrantSaving(false);
+        }
+    };
+
+    const handleDeductDap = async () => {
+        if (!managingUser?.stacks_address || !grantAmount) return;
+        const amount = parseInt(grantAmount, 10);
+        if (!amount || amount <= 0) { toast.error('Enter a valid amount'); return; }
+        setDeductSaving(true);
+        try {
+            const token = await getValidAccessToken();
+            if (!token) throw new Error('Not authenticated');
+            const result = await adminDapDeduct(token, managingUser.stacks_address, amount, grantDescription || 'Admin deduction');
+            const balMsg = result.new_balance != null ? ` · New balance: ${result.new_balance.toLocaleString()} cr` : '';
+            toast.success(`Deducted ${amount} DAP credits from ${managingUser.username}${balMsg}`);
+            setGrantAmount('');
+            setGrantDescription('');
+        } catch (e: any) {
+            toast.error(e.message || 'Deduct failed');
+        } finally {
+            setDeductSaving(false);
+        }
+    };
+
+    const handleZeroOut = async () => {
+        if (!managingUser?.stacks_address) return;
+        setZeroOutSaving(true);
+        try {
+            const token = await getValidAccessToken();
+            if (!token) throw new Error('Not authenticated');
+            // Fetch current balance first
+            const balRes = await fetch(`${API_BASE_URL}/dap/balance/${managingUser.stacks_address}/`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!balRes.ok) throw new Error('Failed to fetch balance');
+            const balData = await balRes.json();
+            const balance = parseInt(balData.balance || '0', 10);
+            if (balance <= 0) { toast.error('Balance is already 0'); return; }
+            const result = await adminDapDeduct(token, managingUser.stacks_address, balance, 'Admin zero-out');
+            toast.success(`Zeroed out ${managingUser.username} — deducted ${balance} credits · New balance: ${result.new_balance ?? 0}`);
+        } catch (e: any) {
+            toast.error(e.message || 'Zero-out failed');
+        } finally {
+            setZeroOutSaving(false);
         }
     };
 
@@ -848,11 +893,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                 {permSaving ? 'Saving…' : 'Save Permissions'}
                             </button>
 
-                            {/* Grant DAP Credits */}
+                            {/* DAP Credits — Grant / Deduct */}
                             {managingUser.stacks_address && (
-                                <div className="mt-5 pt-5 border-t border-borderSubtle">
-                                    <p className="text-xs font-black text-inkLight uppercase tracking-widest mb-3">Grant DAP Credits</p>
-                                    <div className="flex gap-2 mb-2">
+                                <div className="mt-5 pt-5 border-t border-borderSubtle space-y-3">
+                                    <p className="text-xs font-black text-inkLight uppercase tracking-widest">DAP Credits</p>
+                                    <div className="flex gap-2">
                                         <input
                                             type="number"
                                             min="1"
@@ -869,13 +914,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                             className="flex-1 bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
                                         />
                                     </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={handleGrantDap}
+                                            disabled={grantSaving || deductSaving || !grantAmount}
+                                            className="flex-1 py-2.5 border-2 border-dashed border-gold/40 rounded-xl text-sm font-bold text-gold hover:border-gold hover:bg-gold/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        >
+                                            <Zap className="w-4 h-4" />
+                                            {grantSaving ? 'Granting…' : 'Grant'}
+                                        </button>
+                                        <button
+                                            onClick={handleDeductDap}
+                                            disabled={grantSaving || deductSaving || !grantAmount}
+                                            className="flex-1 py-2.5 border-2 border-dashed border-red-500/40 rounded-xl text-sm font-bold text-red-500 hover:border-red-500 hover:bg-red-500/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        >
+                                            <Minus className="w-4 h-4" />
+                                            {deductSaving ? 'Deducting…' : 'Deduct'}
+                                        </button>
+                                    </div>
                                     <button
-                                        onClick={handleGrantDap}
-                                        disabled={grantSaving || !grantAmount}
-                                        className="w-full py-2.5 border-2 border-dashed border-gold/40 rounded-xl text-sm font-bold text-gold hover:border-gold hover:bg-gold/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        onClick={handleZeroOut}
+                                        disabled={zeroOutSaving}
+                                        className="w-full py-2 rounded-xl text-xs font-bold text-red-400 hover:text-red-600 hover:bg-red-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                                     >
-                                        <Zap className="w-4 h-4" />
-                                        {grantSaving ? 'Granting…' : 'Grant Credits'}
+                                        {zeroOutSaving ? 'Zeroing out…' : '⚡ Zero Out Balance'}
                                     </button>
                                 </div>
                             )}
