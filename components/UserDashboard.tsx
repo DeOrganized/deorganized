@@ -69,6 +69,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
    const [isLoadingWallet, setIsLoadingWallet] = useState(true);
    const [isDAPRegistered, setIsDAPRegistered] = useState(false);
    const [isRegisteringDAP, setIsRegisteringDAP] = useState(false);
+   const [copiedAddress, setCopiedAddress] = useState(false);
    const [copiedMemo, setCopiedMemo] = useState(false);
    const [copiedDeposit, setCopiedDeposit] = useState(false);
    const [stxAmount, setStxAmount] = useState('1');
@@ -274,12 +275,26 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                         </div>
                         <h3 className="text-base font-bold text-ink">Wallet & Credits</h3>
                      </div>
-                     <div className="flex items-center gap-1.5 bg-surface border border-borderSubtle px-3 py-1.5 rounded-full">
-                        <div className="w-2 h-2 rounded-full bg-green-500" />
-                        <span className="text-xs font-mono text-inkLight">
-                           {backendUser.stacks_address.slice(0, 6)}…{backendUser.stacks_address.slice(-4)}
-                        </span>
-                     </div>
+                     <button
+                        onClick={() => copyToClipboard(backendUser.stacks_address, setCopiedAddress)}
+                        className="flex items-center gap-1.5 bg-surface border border-borderSubtle px-3 py-1.5 rounded-full hover:border-gold/40 hover:text-gold transition-colors cursor-pointer"
+                        title={backendUser.stacks_address}
+                     >
+                        {copiedAddress ? (
+                           <>
+                              <Check className="w-3 h-3 text-green-500" />
+                              <span className="text-xs font-mono text-green-500">Copied!</span>
+                           </>
+                        ) : (
+                           <>
+                              <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                              <span className="text-xs font-mono text-inkLight">
+                                 {backendUser.stacks_address.slice(0, 6)}…{backendUser.stacks_address.slice(-4)}
+                              </span>
+                              <Copy className="w-3 h-3 text-inkLight/50" />
+                           </>
+                        )}
+                     </button>
                   </div>
 
                   {isLoadingWallet ? (
