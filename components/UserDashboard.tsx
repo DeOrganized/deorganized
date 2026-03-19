@@ -3,7 +3,8 @@ import {
    User, Settings, Clock, Heart, Shield, Zap,
    LogOut, Play, MoreHorizontal, MessageSquare,
    ThumbsUp, ExternalLink, CreditCard, Award, Loader2,
-   UserPlus, Share2, Bell, Crown, Calendar
+   UserPlus, Share2, Bell, Crown, Calendar,
+   Wallet, Coins, Copy, Check
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../lib/AuthContext';
@@ -16,10 +17,18 @@ import {
    fetchNotifications,
    markNotificationRead,
    fetchShowByPk,
+   getDAPStatus,
+   registerDAP,
+   getDAPBalance,
+   getStacksWalletBalances,
    UserProfile,
    Creator,
    Show,
-   Notification
+   Notification,
+   DAPStatus,
+   DAPUser,
+   DAPBalance,
+   StacksWalletBalances,
 } from '../lib/api';
 
 interface UserDashboardProps {
@@ -50,6 +59,17 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
 
    // Error states
    const [profileError, setProfileError] = useState<string | null>(null);
+
+   // Wallet & Credits state
+   const [dapStatus, setDapStatus] = useState<DAPStatus | null>(null);
+   const [dapUser, setDapUser] = useState<DAPUser | null>(null);
+   const [dapBalance, setDapBalance] = useState<DAPBalance | null>(null);
+   const [walletBals, setWalletBals] = useState<StacksWalletBalances | null>(null);
+   const [isLoadingWallet, setIsLoadingWallet] = useState(true);
+   const [isDAPRegistered, setIsDAPRegistered] = useState(false);
+   const [isRegisteringDAP, setIsRegisteringDAP] = useState(false);
+   const [copiedMemo, setCopiedMemo] = useState(false);
+   const [copiedDeposit, setCopiedDeposit] = useState(false);
 
    // Load activity feed
    useEffect(() => {
@@ -127,6 +147,62 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
       loadLikedShows();
    }, [backendUser?.id, accessToken]);
 
+   // Load wallet & DAP data
+   useEffect(() => {
+      const loadWalletData = async () => {
+         if (!accessToken || !backendUser?.stacks_address) {
+            setIsLoadingWallet(false);
+            return;
+         }
+         setIsLoadingWallet(true);
+         const addr = backendUser.stacks_address;
+         try {
+            const [status, bals] = await Promise.all([
+               getDAPStatus(accessToken),
+               getStacksWalletBalances(addr).catch(() => null),
+            ]);
+            setDapStatus(status);
+            setWalletBals(bals);
+
+            // registerDAP is idempotent — creates account if new, returns existing if not
+            const user = await registerDAP(accessToken, addr);
+            setDapUser(user);
+            setIsDAPRegistered(true);
+
+            const bal = await getDAPBalance(accessToken, addr).catch(() => null);
+            setDapBalance(bal);
+         } catch (err) {
+            console.error('Failed to load wallet data:', err);
+            setIsDAPRegistered(false);
+         } finally {
+            setIsLoadingWallet(false);
+         }
+      };
+      loadWalletData();
+   }, [accessToken, backendUser?.stacks_address]);
+
+   const copyToClipboard = (text: string, setter: (v: boolean) => void) => {
+      navigator.clipboard.writeText(text);
+      setter(true);
+      setTimeout(() => setter(false), 2000);
+   };
+
+   const handleRegisterDAP = async () => {
+      if (!accessToken || !backendUser?.stacks_address) return;
+      setIsRegisteringDAP(true);
+      try {
+         const user = await registerDAP(accessToken, backendUser.stacks_address);
+         setDapUser(user);
+         setIsDAPRegistered(true);
+         const bal = await getDAPBalance(accessToken, backendUser.stacks_address).catch(() => null);
+         setDapBalance(bal);
+      } catch (err) {
+         console.error('DAP registration failed:', err);
+      } finally {
+         setIsRegisteringDAP(false);
+      }
+   };
+
    if (!backendUser) {
       return (
          <div className="min-h-screen pt-24 pb-20 container max-w-[1024px] mx-auto px-6 flex items-center justify-center">
@@ -162,6 +238,127 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                <LogOut className="w-4 h-4" /> Sign Out
             </button>
          </div>
+
+         {/* ── WALLET & CREDITS ────────────────────────────────────────── */}
+         {backendUser.stacks_address && (
+            <div className="bg-canvas border border-gold/20 rounded-3xl p-6 shadow-soft relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-64 h-64 bg-gold rounded-full opacity-[0.04] blur-[80px] pointer-events-none" />
+
+               <div className="relative z-10">
+                  {/* Header row */}
+                  <div className="flex items-center justify-between mb-5">
+                     <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center">
+                           <Wallet className="w-4 h-4 text-gold" />
+                        </div>
+                        <h3 className="text-base font-bold text-ink">Wallet & Credits</h3>
+                     </div>
+                     <div className="flex items-center gap-1.5 bg-surface border border-borderSubtle px-3 py-1.5 rounded-full">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        <span className="text-xs font-mono text-inkLight">
+                           {backendUser.stacks_address.slice(0, 6)}…{backendUser.stacks_address.slice(-4)}
+                        </span>
+                     </div>
+                  </div>
+
+                  {isLoadingWallet ? (
+                     <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 text-gold animate-spin" />
+                     </div>
+                  ) : (
+                     <div className="space-y-5">
+                        {/* Token balance row */}
+                        <div className="grid grid-cols-3 gap-3">
+                           <div className="bg-surface border border-borderSubtle rounded-xl p-3">
+                              <p className="text-[10px] font-bold text-inkLight uppercase tracking-wider mb-1">STX</p>
+                              <p className="text-sm font-bold text-gold">{walletBals ? walletBals.stx : '—'}</p>
+                              <p className="text-[10px] text-inkLight">Spendable</p>
+                           </div>
+                           <div className="bg-surface border border-borderSubtle rounded-xl p-3">
+                              <p className="text-[10px] font-bold text-inkLight uppercase tracking-wider mb-1">sBTC</p>
+                              <p className="text-sm font-bold text-gold truncate">{walletBals ? walletBals.sbtc : '—'}</p>
+                              <p className="text-[10px] text-inkLight">Bitcoin</p>
+                           </div>
+                           <div className="bg-surface border border-borderSubtle rounded-xl p-3">
+                              <p className="text-[10px] font-bold text-inkLight uppercase tracking-wider mb-1">USDCx</p>
+                              <p className="text-sm font-bold text-gold">{walletBals ? `$${walletBals.usdcx}` : '—'}</p>
+                              <p className="text-[10px] text-inkLight">Stablecoin</p>
+                           </div>
+                        </div>
+
+                        {/* DAP credit balance */}
+                        <div className="flex items-center justify-between bg-gold/5 border border-gold/20 rounded-xl px-4 py-3">
+                           <div className="flex items-center gap-2">
+                              <Coins className="w-4 h-4 text-gold" />
+                              <span className="text-sm font-semibold text-inkLight">DAP Credits</span>
+                           </div>
+                           <span className="text-2xl font-bold text-gold">
+                              {dapBalance
+                                 ? Number(dapBalance.balance).toLocaleString()
+                                 : '—'}
+                           </span>
+                        </div>
+
+                        {/* Deposit info */}
+                        {isDAPRegistered && dapUser && dapStatus ? (
+                           <div className="border border-borderSubtle rounded-xl p-4 space-y-3">
+                              <p className="text-xs text-inkLight leading-relaxed">
+                                 Send STX to the deposit address with your memo code to receive DAP credits
+                                 <span className="text-gold font-semibold"> (100 credits per STX)</span>.
+                              </p>
+
+                              <div>
+                                 <p className="text-[10px] font-bold text-inkLight uppercase tracking-wider mb-1.5">Deposit Address</p>
+                                 <div className="flex items-center gap-2 bg-surface border border-borderSubtle rounded-lg px-3 py-2">
+                                    <span className="text-xs font-mono text-ink flex-1 truncate">{dapStatus.deposit_address}</span>
+                                    <button
+                                       onClick={() => copyToClipboard(dapStatus.deposit_address, setCopiedDeposit)}
+                                       className="flex-shrink-0 text-inkLight hover:text-gold transition-colors"
+                                       aria-label="Copy deposit address"
+                                    >
+                                       {copiedDeposit
+                                          ? <Check className="w-3.5 h-3.5 text-green-500" />
+                                          : <Copy className="w-3.5 h-3.5" />}
+                                    </button>
+                                 </div>
+                              </div>
+
+                              <div>
+                                 <p className="text-[10px] font-bold text-inkLight uppercase tracking-wider mb-1.5">
+                                    Your Memo Code <span className="text-red-500 font-normal normal-case">(required)</span>
+                                 </p>
+                                 <div className="flex items-center gap-2 bg-surface border border-borderSubtle rounded-lg px-3 py-2">
+                                    <span className="text-xs font-mono font-bold text-gold flex-1">{dapUser.memo_code}</span>
+                                    <button
+                                       onClick={() => copyToClipboard(dapUser.memo_code, setCopiedMemo)}
+                                       className="flex-shrink-0 text-inkLight hover:text-gold transition-colors"
+                                       aria-label="Copy memo code"
+                                    >
+                                       {copiedMemo
+                                          ? <Check className="w-3.5 h-3.5 text-green-500" />
+                                          : <Copy className="w-3.5 h-3.5" />}
+                                    </button>
+                                 </div>
+                              </div>
+                           </div>
+                        ) : !isDAPRegistered ? (
+                           <div className="border border-borderSubtle rounded-xl p-4 text-center space-y-3">
+                              <p className="text-xs text-inkLight">Register with the DAP service to get a memo code and start depositing STX for credits.</p>
+                              <button
+                                 onClick={handleRegisterDAP}
+                                 disabled={isRegisteringDAP}
+                                 className="bg-gold-gradient text-white text-sm font-bold px-6 py-2.5 rounded-full shadow-md shadow-gold/20 hover:shadow-gold/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+                              >
+                                 {isRegisteringDAP && <Loader2 className="w-4 h-4 animate-spin" />}
+                                 Register for Credits
+                              </button>
+                           </div>
+                        ) : null}
+                     </div>
+                  )}
+               </div>
+            </div>
+         )}
 
          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
