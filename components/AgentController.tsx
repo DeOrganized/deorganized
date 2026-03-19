@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, Wallet, Zap, FileText, MessageSquare, Image, Copy, Check, Loader2, RefreshCw, Send, AlertCircle } from 'lucide-react';
+import { Bot, Wallet, Zap, FileText, MessageSquare, Image, Copy, Check, Loader2, RefreshCw, Send, AlertCircle, Terminal, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../lib/AuthContext';
 import {
     getElioWallet, chatWithElio,
-    getSocialAgentWallet, getSocialAgentStatus, getSocialAgentBalance,
+    getSocialAgentWallet, getSocialAgentStatus, getSocialAgentBalance, getSocialAgentLogs,
     getLatestContent, getContentHistory, getContentThumbnailUrl,
     runSocialNews, runSocialStacks,
     ElioWallet, SocialAgentWallet, SocialAgentStatus,
-    ContentPackage, ContentHistoryItem,
+    ContentPackage, ContentHistoryItem, LogLine,
 } from '../lib/api';
 
 export const AgentController: React.FC = () => {
@@ -36,8 +36,11 @@ export const AgentController: React.FC = () => {
     const [copiedArticle, setCopiedArticle] = useState(false);
     const [copiedThread, setCopiedThread] = useState(false);
     const [copiedTweetIndex, setCopiedTweetIndex] = useState<number | null>(null);
+    const [gabbyLogs, setGabbyLogs] = useState<LogLine[]>([]);
     const chatContainerRef = useRef<HTMLDivElement>(null);
+    const logContainerRef = useRef<HTMLDivElement>(null);
     const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const logPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const refreshElioWallet = async () => {
         if (!accessToken || isRefreshingElio) return;
@@ -156,6 +159,27 @@ export const AgentController: React.FC = () => {
         };
     }, [accessToken]);
 
+    // Log polling — fetch every 3 seconds while mounted
+    useEffect(() => {
+        if (!accessToken) return;
+        const fetchLogs = () => {
+            getSocialAgentLogs(accessToken)
+                .then(data => setGabbyLogs(data.lines))
+                .catch(() => {});
+        };
+        fetchLogs();
+        logPollRef.current = setInterval(fetchLogs, 3000);
+        return () => {
+            if (logPollRef.current) clearInterval(logPollRef.current);
+        };
+    }, [accessToken]);
+
+    // Auto-scroll log viewer to bottom on new lines
+    useEffect(() => {
+        const el = logContainerRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+    }, [gabbyLogs]);
+
     useEffect(() => {
         const el = chatContainerRef.current;
         if (el) el.scrollTop = el.scrollHeight;
@@ -184,6 +208,16 @@ export const AgentController: React.FC = () => {
         } finally {
             setChatLoading(false);
         }
+    };
+
+    const getLogColor = (message: string): string => {
+        if (/error|failed|warning/i.test(message)) return 'text-red-400';
+        if (message.includes('[orchestrator]')) return 'text-amber-400';
+        if (message.includes('[x-client]')) return 'text-green-400';
+        if (message.includes('[content-client]')) return 'text-blue-400';
+        if (message.includes('[stx-client]')) return 'text-purple-400';
+        if (message.includes('[scheduler]')) return 'text-amber-300';
+        return 'text-zinc-400';
     };
 
     const copyToClipboard = (text: string, setter: (v: boolean) => void) => {
@@ -394,6 +428,43 @@ export const AgentController: React.FC = () => {
                                 </div>
                             )}
                         </div>
+                    )}
+                </div>
+            </section>
+
+            {/* Gabby Live Logs */}
+            <section className="bg-black border border-zinc-800 rounded-3xl p-6 shadow-soft">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-2xl bg-zinc-900 flex items-center justify-center">
+                        <Terminal className="w-5 h-5 text-zinc-400" />
+                    </div>
+                    <h2 className="text-lg font-bold text-zinc-200">Gabby Logs</h2>
+                    <span className="text-xs text-zinc-600 font-mono ml-1">{gabbyLogs.length}/200</span>
+                    <button
+                        onClick={() => setGabbyLogs([])}
+                        className="ml-auto flex items-center gap-1.5 text-xs text-zinc-600 hover:text-zinc-300 transition-colors"
+                        title="Clear log view (client-side only)"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Clear
+                    </button>
+                </div>
+                <div
+                    ref={logContainerRef}
+                    className="h-72 overflow-y-auto font-mono text-xs space-y-0.5 pr-1"
+                    style={{ scrollbarWidth: 'thin', scrollbarColor: '#3f3f46 transparent' }}
+                >
+                    {gabbyLogs.length === 0 ? (
+                        <p className="text-zinc-700 py-4 text-center">No logs yet — waiting for activity...</p>
+                    ) : (
+                        gabbyLogs.map((line, i) => (
+                            <div key={i} className="flex gap-2 leading-5">
+                                <span className="text-zinc-700 flex-shrink-0 select-none">
+                                    {new Date(line.timestamp).toLocaleTimeString()}
+                                </span>
+                                <span className={getLogColor(line.message)}>{line.message}</span>
+                            </div>
+                        ))
                     )}
                 </div>
             </section>

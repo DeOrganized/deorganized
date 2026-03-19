@@ -2933,6 +2933,19 @@ export const getSocialAgentTransactions = async (token: string): Promise<DAPTran
     return res.json();
 };
 
+export interface LogLine {
+    timestamp: string;
+    message: string;
+}
+
+export const getSocialAgentLogs = async (token: string): Promise<{ lines: LogLine[] }> => {
+    const res = await fetch(`${API_BASE_URL}/agent/social/logs/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch social agent logs');
+    return res.json();
+};
+
 export interface SocialRunResult {
     status: string;
     message?: string;
