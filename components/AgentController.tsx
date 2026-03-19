@@ -55,7 +55,7 @@ export const AgentController: React.FC = () => {
             await Promise.allSettled([
                 getSocialAgentWallet(accessToken).then(setSocialWallet).catch(() => {}),
                 getSocialAgentStatus(accessToken).then(setSocialStatus).catch(() => {}),
-                getSocialAgentBalance(accessToken).then(b => setSocialDapBalance(b.balance)).catch(() => {}),
+                getSocialAgentBalance(accessToken).then(b => setSocialDapBalance(b.credit_balance)).catch(() => {}),
             ]);
         } finally { setIsRefreshingSocial(false); }
     };
@@ -109,7 +109,7 @@ export const AgentController: React.FC = () => {
                 getElioWallet(accessToken).then(setElioWallet).catch(() => {}),
                 getSocialAgentWallet(accessToken).then(setSocialWallet).catch(() => {}),
                 getSocialAgentStatus(accessToken).then(setSocialStatus).catch(() => {}),
-                getSocialAgentBalance(accessToken).then(b => setSocialDapBalance(b.balance)).catch(() => {}),
+                getSocialAgentBalance(accessToken).then(b => setSocialDapBalance(b.credit_balance)).catch(() => {}),
                 getLatestContent(accessToken).then(setLatestContent).catch(() => {}),
                 getContentHistory(accessToken).then(setContentHistory).catch(() => {}),
             ]);
