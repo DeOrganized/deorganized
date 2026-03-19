@@ -529,7 +529,18 @@ export const AgentController: React.FC = () => {
                                     )}
                                     {activeContentTab === 'thumbnail' && (
                                         <motion.div key="thumbnail" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.15 }} className="flex justify-center">
-                                            <img src={getContentThumbnailUrl(latestContent.date, 'landscape')} alt="Generated thumbnail" className="rounded-2xl max-w-full shadow-md" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                            {latestContent.thumbnailLandscape ? (
+                                                <img
+                                                    src={getContentThumbnailUrl(latestContent.date.slice(0, 10), 'landscape')}
+                                                    alt="Generated thumbnail"
+                                                    className="rounded-2xl max-w-full shadow-md"
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).style.display = 'none';
+                                                    }}
+                                                />
+                                            ) : (
+                                                <p className="text-sm text-inkLight py-8 text-center">No thumbnail generated for this pack.</p>
+                                            )}
                                         </motion.div>
                                     )}
                                 </AnimatePresence>

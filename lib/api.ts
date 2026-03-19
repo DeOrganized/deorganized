@@ -2659,6 +2659,9 @@ export interface ContentPackage {
     threadText: string;
     articleText: string;
     narrativeAngle: string;
+    generatedAt: string;
+    thumbnailLandscape: string | null;
+    thumbnailSquare: string | null;
 }
 
 export interface ContentHistoryItem {
