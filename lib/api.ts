@@ -2933,6 +2933,31 @@ export const getSocialAgentTransactions = async (token: string): Promise<DAPTran
     return res.json();
 };
 
+export interface SocialRunResult {
+    status: string;
+    message?: string;
+    serviceType?: string;
+}
+
+export const runSocialNews = async (token: string): Promise<SocialRunResult> => {
+    const res = await fetch(`${API_BASE_URL}/agent/social/run-news/`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    // 409 = already running — return the body so the caller can surface it
+    if (!res.ok && res.status !== 409) throw new Error('Failed to trigger news cycle');
+    return { ...(await res.json()), _status: res.status } as any;
+};
+
+export const runSocialStacks = async (token: string): Promise<SocialRunResult> => {
+    const res = await fetch(`${API_BASE_URL}/agent/social/run-stacks/`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok && res.status !== 409) throw new Error('Failed to trigger stacks cycle');
+    return { ...(await res.json()), _status: res.status } as any;
+};
+
 // --- News Production (admin direct trigger, no DAP credits) ---
 
 export const triggerNewsGeneration = async (

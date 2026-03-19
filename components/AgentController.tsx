@@ -6,6 +6,7 @@ import {
     getElioWallet, chatWithElio,
     getSocialAgentWallet, getSocialAgentStatus, getSocialAgentBalance,
     getLatestContent, getContentHistory, getContentThumbnailUrl,
+    runSocialNews, runSocialStacks,
     ElioWallet, SocialAgentWallet, SocialAgentStatus,
     ContentPackage, ContentHistoryItem,
 } from '../lib/api';
@@ -28,6 +29,9 @@ export const AgentController: React.FC = () => {
     const [isRefreshingAll, setIsRefreshingAll] = useState(false);
     const [isRefreshingSocial, setIsRefreshingSocial] = useState(false);
     const [isRefreshingContent, setIsRefreshingContent] = useState(false);
+    const [isRunningNews, setIsRunningNews] = useState(false);
+    const [isRunningStacks, setIsRunningStacks] = useState(false);
+    const [runStatus, setRunStatus] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [copiedArticle, setCopiedArticle] = useState(false);
     const [copiedThread, setCopiedThread] = useState(false);
@@ -54,6 +58,36 @@ export const AgentController: React.FC = () => {
                 getSocialAgentBalance(accessToken).then(b => setSocialDapBalance(b.balance)).catch(() => {}),
             ]);
         } finally { setIsRefreshingSocial(false); }
+    };
+
+    const handleRunNews = async () => {
+        if (!accessToken || isRunningNews || isRunningStacks) return;
+        setIsRunningNews(true);
+        setRunStatus(null);
+        try {
+            const result = await runSocialNews(accessToken);
+            const is409 = (result as any)._status === 409;
+            setRunStatus(is409 ? 'A cycle is already in progress.' : result.message ?? 'News cycle started.');
+        } catch (e: any) {
+            setRunStatus(e.message ?? 'Failed to start news cycle.');
+        } finally {
+            setIsRunningNews(false);
+        }
+    };
+
+    const handleRunStacks = async () => {
+        if (!accessToken || isRunningNews || isRunningStacks) return;
+        setIsRunningStacks(true);
+        setRunStatus(null);
+        try {
+            const result = await runSocialStacks(accessToken);
+            const is409 = (result as any)._status === 409;
+            setRunStatus(is409 ? 'A cycle is already in progress.' : result.message ?? 'Stacks cycle started.');
+        } catch (e: any) {
+            setRunStatus(e.message ?? 'Failed to start stacks cycle.');
+        } finally {
+            setIsRunningStacks(false);
+        }
     };
 
     const refreshContent = async () => {
@@ -287,6 +321,29 @@ export const AgentController: React.FC = () => {
                         >
                             <RefreshCw className={`w-4 h-4 ${isRefreshingSocial ? 'animate-spin text-gold' : ''}`} />
                         </button>
+                    </div>
+
+                    {/* Cycle trigger buttons */}
+                    <div className="flex items-center gap-3 mb-5">
+                        <button
+                            onClick={handleRunNews}
+                            disabled={isRunningNews || isRunningStacks}
+                            className="flex items-center gap-2 px-4 py-2 bg-gold-gradient text-white text-sm font-bold rounded-xl shadow shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
+                        >
+                            {isRunningNews ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                            Run News
+                        </button>
+                        <button
+                            onClick={handleRunStacks}
+                            disabled={isRunningNews || isRunningStacks}
+                            className="flex items-center gap-2 px-4 py-2 bg-surface border border-borderSubtle text-ink text-sm font-bold rounded-xl hover:border-gold/40 hover:text-gold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isRunningStacks ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                            Run Stacks
+                        </button>
+                        {runStatus && (
+                            <span className="text-xs text-inkLight font-medium">{runStatus}</span>
+                        )}
                     </div>
 
                     {!socialWallet || !socialStatus ? (
