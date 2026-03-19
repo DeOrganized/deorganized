@@ -2821,7 +2821,7 @@ const SBTC_KEY  = 'SP3DX3H4FEYZJZ586MFBS25ZW3HZDMEW92260R2PR.token-sbtc::token-s
 const USDCX_KEY = 'SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.token-usdcx::token-usdcx';
 
 export const getStacksWalletBalances = async (address: string): Promise<StacksWalletBalances> => {
-    const res = await fetch(`${HIRO_API}/v1/address/${address}/balances`);
+    const res = await fetch(`${HIRO_API}/extended/v1/address/${address}/balances`);
     if (!res.ok) throw new Error('Failed to fetch Stacks balances');
     const data = await res.json();
 

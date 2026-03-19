@@ -4,8 +4,9 @@ import {
    LogOut, Play, MoreHorizontal, MessageSquare,
    ThumbsUp, ExternalLink, CreditCard, Award, Loader2,
    UserPlus, Share2, Bell, Crown, Calendar,
-   Wallet, Coins, Copy, Check
+   Wallet, Coins, Copy, Check, ChevronDown, ChevronUp
 } from 'lucide-react';
+import { request } from '@stacks/connect';
 import { motion } from 'framer-motion';
 import { useAuth } from '../lib/AuthContext';
 import { FollowersList } from './FollowersList';
@@ -70,6 +71,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
    const [isRegisteringDAP, setIsRegisteringDAP] = useState(false);
    const [copiedMemo, setCopiedMemo] = useState(false);
    const [copiedDeposit, setCopiedDeposit] = useState(false);
+   const [stxAmount, setStxAmount] = useState('1');
+   const [depositPending, setDepositPending] = useState(false);
+   const [advancedOpen, setAdvancedOpen] = useState(false);
 
    // Load activity feed
    useEffect(() => {
@@ -187,6 +191,23 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
       setTimeout(() => setter(false), 2000);
    };
 
+   const handleBuyCredits = async () => {
+      if (!dapStatus || !dapUser) return;
+      const stx = parseFloat(stxAmount);
+      if (!stx || stx <= 0) return;
+      const microStx = String(Math.round(stx * 1_000_000));
+      try {
+         await request('stx_transferStx', {
+            recipient: dapStatus.deposit_address,
+            amount: microStx,
+            memo: dapUser.memo_code,
+         });
+         setDepositPending(true);
+      } catch {
+         // user cancelled or wallet rejected — do nothing
+      }
+   };
+
    const handleRegisterDAP = async () => {
       if (!accessToken || !backendUser?.stacks_address) return;
       setIsRegisteringDAP(true);
@@ -286,64 +307,102 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                            </div>
                         </div>
 
-                        {/* DAP credit balance */}
-                        <div className="flex items-center justify-between bg-gold/5 border border-gold/20 rounded-xl px-4 py-3">
-                           <div className="flex items-center gap-2">
-                              <Coins className="w-4 h-4 text-gold" />
-                              <span className="text-sm font-semibold text-inkLight">DAP Credits</span>
-                           </div>
-                           <span className="text-2xl font-bold text-gold">
-                              {dapBalance
-                                 ? Number(dapBalance.balance).toLocaleString()
-                                 : '—'}
-                           </span>
-                        </div>
-
-                        {/* Deposit info */}
+                        {/* DAP credit balance + buy */}
                         {isDAPRegistered && dapUser && dapStatus ? (
-                           <div className="border border-borderSubtle rounded-xl p-4 space-y-3">
-                              <p className="text-xs text-inkLight leading-relaxed">
-                                 Send STX to the deposit address with your memo code to receive DAP credits
-                                 <span className="text-gold font-semibold"> (100 credits per STX)</span>.
-                              </p>
-
-                              <div>
-                                 <p className="text-[10px] font-bold text-inkLight uppercase tracking-wider mb-1.5">Deposit Address</p>
-                                 <div className="flex items-center gap-2 bg-surface border border-borderSubtle rounded-lg px-3 py-2">
-                                    <span className="text-xs font-mono text-ink flex-1 truncate">{dapStatus.deposit_address}</span>
-                                    <button
-                                       onClick={() => copyToClipboard(dapStatus.deposit_address, setCopiedDeposit)}
-                                       className="flex-shrink-0 text-inkLight hover:text-gold transition-colors"
-                                       aria-label="Copy deposit address"
-                                    >
-                                       {copiedDeposit
-                                          ? <Check className="w-3.5 h-3.5 text-green-500" />
-                                          : <Copy className="w-3.5 h-3.5" />}
-                                    </button>
+                           <>
+                              <div className="flex items-center justify-between bg-gold/5 border border-gold/20 rounded-xl px-4 py-3">
+                                 <div>
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                       <Coins className="w-4 h-4 text-gold" />
+                                       <span className="text-xs font-semibold text-inkLight uppercase tracking-wider">DAP Credits</span>
+                                    </div>
+                                    <span className="text-3xl font-bold text-gold">
+                                       {dapBalance ? Number(dapBalance.balance).toLocaleString() : '—'}
+                                    </span>
                                  </div>
+                                 {depositPending ? (
+                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-gold bg-gold/10 border border-gold/20 px-3 py-2 rounded-xl">
+                                       <Loader2 className="w-3.5 h-3.5 animate-spin" /> Deposit pending…
+                                    </div>
+                                 ) : (
+                                    <div className="flex flex-col items-end gap-2">
+                                       <div className="flex items-center gap-2">
+                                          <input
+                                             type="number"
+                                             min="1"
+                                             step="1"
+                                             value={stxAmount}
+                                             onChange={e => setStxAmount(e.target.value)}
+                                             className="w-16 text-sm font-bold text-center bg-surface border border-borderSubtle rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:border-gold"
+                                          />
+                                          <span className="text-xs text-inkLight font-medium">STX</span>
+                                          <button
+                                             onClick={handleBuyCredits}
+                                             className="bg-gold-gradient text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-md shadow-gold/20 hover:shadow-gold/40 transition-all hover:-translate-y-0.5"
+                                          >
+                                             Buy Credits
+                                          </button>
+                                       </div>
+                                       <p className="text-[10px] text-inkLight">
+                                          = {(parseFloat(stxAmount) * 100 || 0).toLocaleString()} credits
+                                       </p>
+                                    </div>
+                                 )}
                               </div>
 
-                              <div>
-                                 <p className="text-[10px] font-bold text-inkLight uppercase tracking-wider mb-1.5">
-                                    Your Memo Code <span className="text-red-500 font-normal normal-case">(required)</span>
-                                 </p>
-                                 <div className="flex items-center gap-2 bg-surface border border-borderSubtle rounded-lg px-3 py-2">
-                                    <span className="text-xs font-mono font-bold text-gold flex-1">{dapUser.memo_code}</span>
-                                    <button
-                                       onClick={() => copyToClipboard(dapUser.memo_code, setCopiedMemo)}
-                                       className="flex-shrink-0 text-inkLight hover:text-gold transition-colors"
-                                       aria-label="Copy memo code"
-                                    >
-                                       {copiedMemo
-                                          ? <Check className="w-3.5 h-3.5 text-green-500" />
-                                          : <Copy className="w-3.5 h-3.5" />}
-                                    </button>
-                                 </div>
+                              {/* Advanced: manual deposit (for funding a different wallet) */}
+                              <div className="border border-borderSubtle rounded-xl overflow-hidden">
+                                 <button
+                                    onClick={() => setAdvancedOpen(v => !v)}
+                                    className="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-inkLight hover:text-ink transition-colors"
+                                 >
+                                    <span>Advanced — Fund a different wallet</span>
+                                    {advancedOpen
+                                       ? <ChevronUp className="w-4 h-4" />
+                                       : <ChevronDown className="w-4 h-4" />}
+                                 </button>
+                                 {advancedOpen && (
+                                    <div className="px-4 pb-4 space-y-3 border-t border-borderSubtle">
+                                       <p className="text-xs text-inkLight leading-relaxed pt-3">
+                                          Send STX from any wallet to the deposit address below.
+                                          Include your memo code so the system knows to credit your account.
+                                          <span className="text-gold font-semibold"> 100 credits per STX</span>, detected within 30 seconds.
+                                       </p>
+                                       <div>
+                                          <p className="text-[10px] font-bold text-inkLight uppercase tracking-wider mb-1.5">Deposit Address</p>
+                                          <div className="flex items-center gap-2 bg-surface border border-borderSubtle rounded-lg px-3 py-2">
+                                             <span className="text-xs font-mono text-ink flex-1 truncate">{dapStatus.deposit_address}</span>
+                                             <button
+                                                onClick={() => copyToClipboard(dapStatus.deposit_address, setCopiedDeposit)}
+                                                className="flex-shrink-0 text-inkLight hover:text-gold transition-colors"
+                                                aria-label="Copy deposit address"
+                                             >
+                                                {copiedDeposit ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                             </button>
+                                          </div>
+                                       </div>
+                                       <div>
+                                          <p className="text-[10px] font-bold text-inkLight uppercase tracking-wider mb-1.5">
+                                             Memo Code <span className="text-red-500 font-normal normal-case">(required)</span>
+                                          </p>
+                                          <div className="flex items-center gap-2 bg-surface border border-borderSubtle rounded-lg px-3 py-2">
+                                             <span className="text-xs font-mono font-bold text-gold flex-1">{dapUser.memo_code}</span>
+                                             <button
+                                                onClick={() => copyToClipboard(dapUser.memo_code, setCopiedMemo)}
+                                                className="flex-shrink-0 text-inkLight hover:text-gold transition-colors"
+                                                aria-label="Copy memo code"
+                                             >
+                                                {copiedMemo ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                             </button>
+                                          </div>
+                                       </div>
+                                    </div>
+                                 )}
                               </div>
-                           </div>
+                           </>
                         ) : !isDAPRegistered ? (
                            <div className="border border-borderSubtle rounded-xl p-4 text-center space-y-3">
-                              <p className="text-xs text-inkLight">Register with the DAP service to get a memo code and start depositing STX for credits.</p>
+                              <p className="text-xs text-inkLight">Register with the DAP service to get your credit account and start buying credits.</p>
                               <button
                                  onClick={handleRegisterDAP}
                                  disabled={isRegisteringDAP}
