@@ -673,13 +673,70 @@ export const AgentController: React.FC = () => {
                             </section>
                         </div>
 
-                        {/* Conversations panel */}
+                        {/* Chat with Elio */}
+                        <section className="bg-canvas border border-borderSubtle rounded-3xl p-6 shadow-soft">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-2xl bg-gold/10 flex items-center justify-center">
+                                    <MessageSquare className="w-5 h-5 text-gold" />
+                                </div>
+                                <h2 className="text-lg font-bold text-ink">Chat with Elio</h2>
+                            </div>
+                            <div ref={chatContainerRef} className="h-80 overflow-y-auto bg-surface rounded-2xl p-4 space-y-3 mb-4">
+                                {chatMessages.length === 0 && (
+                                    <p className="text-sm text-inkLight text-center py-8">Send a message to start chatting with Long Elio.</p>
+                                )}
+                                {chatMessages.map((msg, i) => (
+                                    <div key={i} className={`flex items-start gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                                        {msg.role === 'agent' && (
+                                            <div className="w-7 h-7 rounded-full bg-gold/10 flex items-center justify-center shrink-0 mt-0.5">
+                                                <Bot className="w-4 h-4 text-gold" />
+                                            </div>
+                                        )}
+                                        <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm font-medium ${
+                                            msg.role === 'user' ? 'bg-gold/10 text-ink ml-auto' : 'bg-canvas text-ink border border-borderSubtle'
+                                        }`}>
+                                            {msg.text}
+                                        </div>
+                                    </div>
+                                ))}
+                                {chatLoading && (
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-7 h-7 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+                                            <Bot className="w-4 h-4 text-gold" />
+                                        </div>
+                                        <div className="bg-canvas border border-borderSubtle rounded-2xl px-4 py-2.5">
+                                            <Loader2 className="w-4 h-4 animate-spin text-gold" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex gap-3">
+                                <input
+                                    type="text"
+                                    value={chatInput}
+                                    onChange={e => setChatInput(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') handleChat(); }}
+                                    placeholder="Ask Elio anything..."
+                                    className="flex-1 bg-surface border border-borderSubtle rounded-2xl px-4 py-3 text-sm font-medium text-ink placeholder:text-inkLight focus:outline-none focus:border-gold/60 transition-colors"
+                                    disabled={chatLoading || !accessToken}
+                                />
+                                <button
+                                    onClick={handleChat}
+                                    disabled={chatLoading || !chatInput.trim() || !accessToken}
+                                    className="flex items-center gap-2 px-5 py-3 bg-gold-gradient text-white font-bold rounded-2xl shadow-lg shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
+                                >
+                                    {chatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                </button>
+                            </div>
+                        </section>
+
+                        {/* AIBTC Network Conversations panel */}
                         <section className="bg-canvas border border-borderSubtle rounded-3xl p-6 shadow-soft">
                             <div className="flex items-center gap-3 mb-5">
                                 <div className="w-10 h-10 rounded-2xl bg-gold/10 flex items-center justify-center">
                                     <MessageSquare className="w-5 h-5 text-gold" />
                                 </div>
-                                <h2 className="text-lg font-bold text-ink">Network Conversations</h2>
+                                <h2 className="text-lg font-bold text-ink">AIBTC Network Conversations</h2>
                                 {elioConvs && (
                                     <span className="text-xs text-inkLight font-mono ml-1">{elioConvs.total} total</span>
                                 )}
@@ -932,62 +989,6 @@ export const AgentController: React.FC = () => {
                             )}
                         </section>
 
-                        {/* Chat with Elio */}
-                        <section className="bg-canvas border border-borderSubtle rounded-3xl p-6 shadow-soft">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-2xl bg-gold/10 flex items-center justify-center">
-                                    <MessageSquare className="w-5 h-5 text-gold" />
-                                </div>
-                                <h2 className="text-lg font-bold text-ink">Chat with Elio</h2>
-                            </div>
-                            <div ref={chatContainerRef} className="h-80 overflow-y-auto bg-surface rounded-2xl p-4 space-y-3 mb-4">
-                                {chatMessages.length === 0 && (
-                                    <p className="text-sm text-inkLight text-center py-8">Send a message to start chatting with Long Elio.</p>
-                                )}
-                                {chatMessages.map((msg, i) => (
-                                    <div key={i} className={`flex items-start gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                                        {msg.role === 'agent' && (
-                                            <div className="w-7 h-7 rounded-full bg-gold/10 flex items-center justify-center shrink-0 mt-0.5">
-                                                <Bot className="w-4 h-4 text-gold" />
-                                            </div>
-                                        )}
-                                        <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm font-medium ${
-                                            msg.role === 'user' ? 'bg-gold/10 text-ink ml-auto' : 'bg-canvas text-ink border border-borderSubtle'
-                                        }`}>
-                                            {msg.text}
-                                        </div>
-                                    </div>
-                                ))}
-                                {chatLoading && (
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
-                                            <Bot className="w-4 h-4 text-gold" />
-                                        </div>
-                                        <div className="bg-canvas border border-borderSubtle rounded-2xl px-4 py-2.5">
-                                            <Loader2 className="w-4 h-4 animate-spin text-gold" />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex gap-3">
-                                <input
-                                    type="text"
-                                    value={chatInput}
-                                    onChange={e => setChatInput(e.target.value)}
-                                    onKeyDown={e => { if (e.key === 'Enter') handleChat(); }}
-                                    placeholder="Ask Elio anything..."
-                                    className="flex-1 bg-surface border border-borderSubtle rounded-2xl px-4 py-3 text-sm font-medium text-ink placeholder:text-inkLight focus:outline-none focus:border-gold/60 transition-colors"
-                                    disabled={chatLoading || !accessToken}
-                                />
-                                <button
-                                    onClick={handleChat}
-                                    disabled={chatLoading || !chatInput.trim() || !accessToken}
-                                    className="flex items-center gap-2 px-5 py-3 bg-gold-gradient text-white font-bold rounded-2xl shadow-lg shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
-                                >
-                                    {chatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                                </button>
-                            </div>
-                        </section>
                     </motion.div>
                 )}
             </AnimatePresence>
