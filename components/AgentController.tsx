@@ -25,6 +25,9 @@ export const AgentController: React.FC = () => {
     const [chatLoading, setChatLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [isRefreshingElio, setIsRefreshingElio] = useState(false);
+    const [isRefreshingAll, setIsRefreshingAll] = useState(false);
+    const [isRefreshingSocial, setIsRefreshingSocial] = useState(false);
+    const [isRefreshingContent, setIsRefreshingContent] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [copiedArticle, setCopiedArticle] = useState(false);
     const [copiedThread, setCopiedThread] = useState(false);
@@ -39,6 +42,44 @@ export const AgentController: React.FC = () => {
             await getElioWallet(accessToken).then(setElioWallet);
         } catch (e) {}
         finally { setIsRefreshingElio(false); }
+    };
+
+    const refreshSocial = async () => {
+        if (!accessToken || isRefreshingSocial) return;
+        setIsRefreshingSocial(true);
+        try {
+            await Promise.allSettled([
+                getSocialAgentWallet(accessToken).then(setSocialWallet).catch(() => {}),
+                getSocialAgentStatus(accessToken).then(setSocialStatus).catch(() => {}),
+                getSocialAgentBalance(accessToken).then(b => setSocialDapBalance(b.balance)).catch(() => {}),
+            ]);
+        } finally { setIsRefreshingSocial(false); }
+    };
+
+    const refreshContent = async () => {
+        if (!accessToken || isRefreshingContent) return;
+        setIsRefreshingContent(true);
+        try {
+            await Promise.allSettled([
+                getLatestContent(accessToken).then(setLatestContent).catch(() => {}),
+                getContentHistory(accessToken).then(setContentHistory).catch(() => {}),
+            ]);
+        } finally { setIsRefreshingContent(false); }
+    };
+
+    const refreshAll = async () => {
+        if (!accessToken || isRefreshingAll) return;
+        setIsRefreshingAll(true);
+        try {
+            await Promise.allSettled([
+                getElioWallet(accessToken).then(setElioWallet).catch(() => {}),
+                getSocialAgentWallet(accessToken).then(setSocialWallet).catch(() => {}),
+                getSocialAgentStatus(accessToken).then(setSocialStatus).catch(() => {}),
+                getSocialAgentBalance(accessToken).then(b => setSocialDapBalance(b.balance)).catch(() => {}),
+                getLatestContent(accessToken).then(setLatestContent).catch(() => {}),
+                getContentHistory(accessToken).then(setContentHistory).catch(() => {}),
+            ]);
+        } finally { setIsRefreshingAll(false); }
     };
 
     const fetchVitals = async () => {
@@ -133,7 +174,17 @@ export const AgentController: React.FC = () => {
 
     return (
         <div className="space-y-8">
-            <h1 className="text-4xl font-bold text-ink">Agent Controller</h1>
+            <div className="flex items-center justify-between">
+                <h1 className="text-4xl font-bold text-ink">Agent Controller</h1>
+                <button
+                    onClick={refreshAll}
+                    disabled={isRefreshingAll}
+                    className="flex items-center gap-2 px-4 py-2 bg-surface border border-borderSubtle text-inkLight hover:text-ink hover:border-gold/40 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <RefreshCw className={`w-4 h-4 ${isRefreshingAll ? 'animate-spin text-gold' : ''}`} />
+                    Refresh All
+                </button>
+            </div>
 
             {error && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 flex items-center gap-3">
@@ -212,15 +263,15 @@ export const AgentController: React.FC = () => {
                     )}
                 </div>
 
-                {/* Social Agent Card */}
+                {/* Gabby Card */}
                 <div className="bg-canvas border border-borderSubtle rounded-3xl p-6 shadow-soft">
                     <div className="flex items-center gap-3 mb-5">
                         <div className="w-10 h-10 rounded-2xl bg-gold/10 flex items-center justify-center">
                             <Zap className="w-5 h-5 text-gold" />
                         </div>
-                        <h2 className="text-lg font-bold text-ink">Social Agent</h2>
+                        <h2 className="text-lg font-bold text-ink">Gabby</h2>
                         {socialStatus && (
-                            <span className={`ml-auto text-xs font-bold px-3 py-1 rounded-full ${
+                            <span className={`text-xs font-bold px-3 py-1 rounded-full ${
                                 socialStatus.running
                                     ? 'bg-green-500/10 text-green-600 border border-green-200'
                                     : 'bg-surface text-inkLight border border-borderSubtle'
@@ -228,6 +279,14 @@ export const AgentController: React.FC = () => {
                                 {socialStatus.running ? 'Running' : 'Idle'}
                             </span>
                         )}
+                        <button
+                            onClick={refreshSocial}
+                            disabled={isRefreshingSocial}
+                            className="ml-auto text-inkLight hover:text-gold transition-colors disabled:opacity-50"
+                            aria-label="Refresh Gabby"
+                        >
+                            <RefreshCw className={`w-4 h-4 ${isRefreshingSocial ? 'animate-spin text-gold' : ''}`} />
+                        </button>
                     </div>
 
                     {!socialWallet || !socialStatus ? (
@@ -355,7 +414,17 @@ export const AgentController: React.FC = () => {
             {/* Latest Content */}
             {latestContent && (
                 <section className="bg-canvas border border-borderSubtle rounded-3xl p-6 shadow-soft">
-                    <h2 className="text-xl font-bold text-ink mb-5">Latest Content</h2>
+                    <div className="flex items-center justify-between mb-5">
+                        <h2 className="text-xl font-bold text-ink">Latest Content</h2>
+                        <button
+                            onClick={refreshContent}
+                            disabled={isRefreshingContent}
+                            className="text-inkLight hover:text-gold transition-colors disabled:opacity-50"
+                            aria-label="Refresh content"
+                        >
+                            <RefreshCw className={`w-4 h-4 ${isRefreshingContent ? 'animate-spin text-gold' : ''}`} />
+                        </button>
+                    </div>
 
                     {/* Content tabs */}
                     <div className="flex gap-2 mb-6">
