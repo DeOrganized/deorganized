@@ -2894,6 +2894,47 @@ export interface SocialAgentStatus {
     credit_balance: string;
 }
 
+export interface ElioStatus {
+    agent: {
+        name: string;
+        btcAddress: string;
+        stxAddress: string;
+        registered: boolean;
+        lastHeartbeat: string | null;
+    };
+    memory: {
+        peopleCount: number;
+        learningsCount: number;
+        marketResponsesCount: number;
+        lastUpdated: string | null;
+    };
+}
+
+export interface ElioMemory {
+    people: Record<string, { notes: string; last_seen: string; manually_trained?: boolean }>;
+    market_research: {
+        responses: { from: string; insight: string; timestamp: string }[];
+        summary: string;
+    };
+    learnings: string[];
+    last_updated: string | null;
+}
+
+export interface ElioConversation {
+    timestamp: string;
+    type: string;
+    from: string;
+    incoming: string;
+    reply: string;
+}
+
+export interface ElioConversations {
+    total: number;
+    page: number;
+    limit: number;
+    conversations: ElioConversation[];
+}
+
 // --- Long Elio ---
 
 export const getElioWallet = async (token: string): Promise<ElioWallet> => {
@@ -2901,6 +2942,48 @@ export const getElioWallet = async (token: string): Promise<ElioWallet> => {
         headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('Failed to fetch Elio wallet');
+    return res.json();
+};
+
+export const getElioStatus = async (token: string): Promise<ElioStatus> => {
+    const res = await fetch(`${API_BASE_URL}/agent/status/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch Elio status');
+    return res.json();
+};
+
+export const getElioMemory = async (token: string): Promise<ElioMemory> => {
+    const res = await fetch(`${API_BASE_URL}/agent/memory/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch Elio memory');
+    return res.json();
+};
+
+export const getElioConversations = async (token: string, page = 1): Promise<ElioConversations> => {
+    const res = await fetch(`${API_BASE_URL}/agent/conversations/?page=${page}&limit=20`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch Elio conversations');
+    return res.json();
+};
+
+export const trainElio = async (
+    token: string,
+    type: 'learning' | 'person' | 'market',
+    content: string,
+    address?: string,
+): Promise<{ success: boolean; type: string; content: string }> => {
+    const res = await fetch(`${API_BASE_URL}/agent/train/`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type, content, ...(address ? { address } : {}) }),
+    });
+    if (!res.ok) throw new Error('Failed to train Elio');
     return res.json();
 };
 
