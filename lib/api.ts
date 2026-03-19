@@ -2817,8 +2817,8 @@ export interface StacksWalletBalances {
 }
 
 const HIRO_API = 'https://api.hiro.so';
-const SBTC_KEY  = 'SP3DX3H4FEYZJZ586MFBS25ZW3HZDMEW92260R2PR.token-sbtc::token-sbtc';
-const USDCX_KEY = 'SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.token-usdcx::token-usdcx';
+const SBTC_KEY  = 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token::sbtc-token';
+const USDCX_KEY = 'SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE.usdcx::usdcx-token';
 
 export const getStacksWalletBalances = async (address: string): Promise<StacksWalletBalances> => {
     const res = await fetch(`${HIRO_API}/extended/v1/address/${address}/balances`);
