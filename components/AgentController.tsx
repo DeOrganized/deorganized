@@ -357,7 +357,7 @@ export const AgentController: React.FC = () => {
                                 <div className="bg-surface rounded-xl p-3 text-center">
                                     <p className="text-[10px] font-black text-inkLight uppercase tracking-wider mb-1">STX</p>
                                     <p className="text-sm font-black text-ink">
-                                        {(socialWallet.stx.spendable / 1_000_000).toFixed(2)}
+                                        {socialWallet.stx.spendable.toFixed(2)}
                                     </p>
                                 </div>
                                 <div className="bg-surface rounded-xl p-3 text-center">
