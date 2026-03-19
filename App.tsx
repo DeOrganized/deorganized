@@ -2,9 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
-import { Sponsors } from './components/Sponsors';
-import { UpcomingShows } from './components/UpcomingShows';
-import { CreatorBanner } from './components/CreatorBanner';
 import { Footer } from './components/Footer';
 import { ShowsDiscovery } from './components/ShowsDiscovery';
 import { CreatorsDiscovery } from './components/CreatorsDiscovery';
@@ -147,26 +144,7 @@ const AppContent: React.FC = () => {
         return <ProfileSetup onNavigate={handleNavigate} />;
       case 'home':
       default:
-        return (
-          <>
-            <Hero onNavigate={handleNavigate} />
-            <Sponsors />
-
-            {/* Editorial & Shows Section */}
-            <section className="py-20 relative z-10">
-              <UpcomingShows onNavigate={handleNavigate} />
-            </section>
-
-            {/* Community & Ecosystem */}
-            <section className="py-12 space-y-24 container mx-auto px-6 max-w-[1280px]">
-              <CreatorBanner
-                onNavigate={handleNavigate}
-                userRole={backendUser?.role || null}
-                isAuthenticated={isBackendAuthenticated}
-              />
-            </section>
-          </>
-        );
+        return <Hero onNavigate={handleNavigate} />;
     }
   };
 
