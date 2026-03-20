@@ -143,98 +143,7 @@ export const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
         </div>
       </section>
 
-      {/* ── SECTION 3: STATS BAR ────────────────────────────────────────── */}
-      <section className="py-12 bg-surface border-y border-borderSubtle">
-        <div className="container max-w-[1280px] mx-auto px-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {([
-              { Icon: Cpu, stat: '7', label: 'Services Running', detail: undefined },
-              { Icon: Bot, stat: '2', label: 'Mainnet Agents', detail: undefined },
-              { Icon: Shield, stat: '3', label: 'On-Chain Tokens', detail: 'STX · sBTC · USDCx' },
-            ] as const).map(({ Icon, stat, label, detail }) => (
-              <div
-                key={label}
-                className="flex items-center gap-4 bg-canvas rounded-xl p-5 border border-borderSubtle"
-              >
-                <div className="w-10 h-10 rounded-lg bg-gold/10 flex items-center justify-center flex-shrink-0">
-                  <Icon className="w-5 h-5 text-gold" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-ink">{stat}</div>
-                  <div className="text-sm text-inkLight font-medium">{label}</div>
-                  {detail && (
-                    <div className="text-xs text-gold font-mono mt-0.5">{detail}</div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── SECTION 4: HOW IT WORKS ─────────────────────────────────────── */}
-      <section className="py-24 bg-canvas">
-        <div className="container max-w-[1280px] mx-auto px-6">
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-3xl md:text-4xl font-bold text-ink mb-12 text-center"
-          >
-            How It Works
-          </motion.h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            {([
-              {
-                step: '01',
-                Icon: Wallet,
-                title: 'Connect Your Wallet',
-                desc: 'Sign in with your Stacks wallet. Your address is your identity — no passwords, no email.',
-              },
-              {
-                step: '02',
-                Icon: Zap,
-                title: 'Fund Your Account',
-                desc: 'Deposit STX to receive DAP credits. 100 credits per STX, detected automatically within 30 seconds.',
-              },
-              {
-                step: '03',
-                Icon: Sparkles,
-                title: 'Generate Content',
-                desc: 'Spend credits to produce news articles, X threads, and thumbnails — powered by AI, guided by your editorial direction.',
-              },
-              {
-                step: '04',
-                Icon: Bot,
-                title: 'Agents Handle the Rest',
-                desc: 'Autonomous agents post to social media, tip creators on-chain, and keep the content cycle running.',
-              },
-            ] as const).map(({ step, Icon, title, desc }, i) => (
-              <motion.div
-                key={step}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
-                className="bg-surface border border-borderSubtle rounded-xl p-6 flex flex-col gap-3"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-mono font-bold text-gold tracking-widest">{step}</span>
-                  <div className="w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center">
-                    <Icon className="w-4 h-4 text-gold" />
-                  </div>
-                </div>
-                <h3 className="text-base font-bold text-ink">{title}</h3>
-                <p className="text-sm text-inkLight leading-relaxed">{desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── SECTION 5: AUDIENCE CARDS ───────────────────────────────────── */}
+      {/* ── SECTION 3: AUDIENCE CARDS ───────────────────────────────────── */}
       <section className="py-24 bg-surface border-t border-borderSubtle">
         <div className="container max-w-[1280px] mx-auto px-6">
           <motion.div
@@ -308,6 +217,97 @@ export const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
                     {cta} →
                   </button>
                 )}
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── SECTION 4: STATS BAR ────────────────────────────────────────── */}
+      <section className="py-12 bg-surface border-y border-borderSubtle">
+        <div className="container max-w-[1280px] mx-auto px-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {([
+              { Icon: Cpu, stat: '7', label: 'Services Running', detail: undefined },
+              { Icon: Bot, stat: '2', label: 'Mainnet Agents', detail: undefined },
+              { Icon: Shield, stat: '3', label: 'On-Chain Tokens', detail: 'STX · sBTC · USDCx' },
+            ] as const).map(({ Icon, stat, label, detail }) => (
+              <div
+                key={label}
+                className="flex items-center gap-4 bg-canvas rounded-xl p-5 border border-borderSubtle"
+              >
+                <div className="w-10 h-10 rounded-lg bg-gold/10 flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-5 h-5 text-gold" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-ink">{stat}</div>
+                  <div className="text-sm text-inkLight font-medium">{label}</div>
+                  {detail && (
+                    <div className="text-xs text-gold font-mono mt-0.5">{detail}</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── SECTION 5: HOW IT WORKS ─────────────────────────────────────── */}
+      <section className="py-24 bg-canvas">
+        <div className="container max-w-[1280px] mx-auto px-6">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-3xl md:text-4xl font-bold text-ink mb-12 text-center"
+          >
+            How It Works
+          </motion.h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
+            {([
+              {
+                step: '01',
+                Icon: Wallet,
+                title: 'Connect Your Wallet',
+                desc: 'Sign in with your Stacks wallet. Your address is your identity — no passwords, no email.',
+              },
+              {
+                step: '02',
+                Icon: Zap,
+                title: 'Fund Your Account',
+                desc: 'Deposit STX to receive DAP credits. 100 credits per STX, detected automatically within 30 seconds.',
+              },
+              {
+                step: '03',
+                Icon: Sparkles,
+                title: 'Generate Content',
+                desc: 'Spend credits to produce news articles, X threads, and thumbnails — powered by AI, guided by your editorial direction.',
+              },
+              {
+                step: '04',
+                Icon: Bot,
+                title: 'Agents Handle the Rest',
+                desc: 'Autonomous agents post to social media, tip creators on-chain, and keep the content cycle running.',
+              },
+            ] as const).map(({ step, Icon, title, desc }, i) => (
+              <motion.div
+                key={step}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+                className="bg-surface border border-borderSubtle rounded-xl p-6 flex flex-col gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono font-bold text-gold tracking-widest">{step}</span>
+                  <div className="w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center">
+                    <Icon className="w-4 h-4 text-gold" />
+                  </div>
+                </div>
+                <h3 className="text-base font-bold text-ink">{title}</h3>
+                <p className="text-sm text-inkLight leading-relaxed">{desc}</p>
               </motion.div>
             ))}
           </div>
