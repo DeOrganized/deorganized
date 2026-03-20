@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     Bot, Zap, FileText, MessageSquare, Image, Copy, Check, Loader2, RefreshCw,
-    Send, AlertCircle, Terminal, Trash2, ChevronDown, ChevronUp, Users, Brain, BarChart2,
+    Send, AlertCircle, Terminal, Trash2, ChevronDown, ChevronUp, Users, Brain, BarChart2, Settings,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../lib/AuthContext';
 import {
     getElioWallet, getElioStatus, getElioMemory, getElioConversations, chatWithElio, trainElio,
     getSocialAgentWallet, getSocialAgentStatus, getSocialAgentBalance, getSocialAgentLogs,
+    getSocialConfig, updateSocialConfig, GabbyConfig,
     getLatestContent, getContentHistory, getContentThumbnailUrl,
     runSocialNews, runSocialStacks,
     ElioWallet, ElioStatus, ElioMemory, ElioConversations,
@@ -52,6 +53,8 @@ export const AgentController: React.FC = () => {
     const [socialStatus,       setSocialStatus]       = useState<SocialAgentStatus | null>(null);
     const [socialDapBalance,   setSocialDapBalance]   = useState<string>('0');
     const [isRefreshingSocial, setIsRefreshingSocial] = useState(false);
+    const [gabbyConfig,        setGabbyConfig]        = useState<GabbyConfig | null>(null);
+    const [configSaving,       setConfigSaving]       = useState(false);
     const [isRunningNews,      setIsRunningNews]      = useState(false);
     const [isRunningStacks,    setIsRunningStacks]    = useState(false);
     const [runStatus,          setRunStatus]          = useState<string | null>(null);
@@ -94,6 +97,7 @@ export const AgentController: React.FC = () => {
             getSocialAgentWallet(accessToken).then(setSocialWallet).catch(() => {}),
             getSocialAgentStatus(accessToken).then(setSocialStatus).catch(() => {}),
             getSocialAgentBalance(accessToken).then(b => setSocialDapBalance(b.credit_balance)).catch(() => {}),
+            getSocialConfig(accessToken).then(setGabbyConfig).catch(() => {}),
         ]);
     };
 
@@ -196,6 +200,19 @@ export const AgentController: React.FC = () => {
         } catch (e: any) {
             setRunStatus(e.message ?? 'Failed to start stacks cycle.');
         } finally { setIsRunningStacks(false); }
+    };
+
+    const handleToggleFlag = async (key: keyof GabbyConfig) => {
+        if (!gabbyConfig || !accessToken || configSaving) return;
+        setConfigSaving(true);
+        try {
+            const updated = await updateSocialConfig(accessToken, { [key]: !gabbyConfig[key] });
+            setGabbyConfig(updated);
+        } catch (e: any) {
+            console.error('Config update failed:', e.message);
+        } finally {
+            setConfigSaving(false);
+        }
     };
 
     const handleTrain = async () => {
@@ -382,6 +399,45 @@ export const AgentController: React.FC = () => {
                                 {runStatus && <span className="text-xs text-inkLight font-medium">{runStatus}</span>}
                             </div>
 
+                            {/* Runtime Controls */}
+                            <div className="bg-surface rounded-2xl p-4 mb-4 border border-borderSubtle">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Settings className="w-3.5 h-3.5 text-inkLight" />
+                                    <p className="text-xs font-black text-inkLight uppercase tracking-widest">Runtime Controls</p>
+                                    {configSaving && <Loader2 className="w-3 h-3 animate-spin text-gold ml-auto" />}
+                                </div>
+                                {!gabbyConfig ? (
+                                    <p className="text-xs text-inkLight">Loading config...</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {([
+                                            { key: 'skip_content_gen' as keyof GabbyConfig, label: 'Skip Content Gen', desc: 'Use last pack instead of generating' },
+                                            { key: 'skip_x_post'      as keyof GabbyConfig, label: 'Skip X Post',      desc: 'Skip posting to X/Twitter' },
+                                            { key: 'skip_tips'        as keyof GabbyConfig, label: 'Skip Tips',        desc: 'Skip sBTC + USDCx tips' },
+                                        ]).map(({ key, label, desc }) => (
+                                            <div key={key} className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold text-ink">{label}</p>
+                                                    <p className="text-xs text-inkLight truncate">{desc}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleToggleFlag(key)}
+                                                    disabled={configSaving}
+                                                    aria-label={`Toggle ${label}`}
+                                                    className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 disabled:opacity-50 ${
+                                                        gabbyConfig[key] ? 'bg-amber-500' : 'bg-zinc-300'
+                                                    }`}
+                                                >
+                                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                                                        gabbyConfig[key] ? 'translate-x-5' : 'translate-x-0'
+                                                    }`} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
                             {!socialWallet || !socialStatus ? (
                                 <div className="flex items-center gap-2 py-4">
                                     <Loader2 className="w-4 h-4 animate-spin text-gold" />
@@ -467,7 +523,14 @@ export const AgentController: React.FC = () => {
                         {latestContent && (
                             <section className="bg-canvas border border-borderSubtle rounded-3xl p-6 shadow-soft">
                                 <div className="flex items-center justify-between mb-5">
-                                    <h2 className="text-xl font-bold text-ink">Latest Content</h2>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-ink">Latest Content</h2>
+                                        {latestContent.generatedAt && (
+                                            <p className="text-xs text-inkLight mt-0.5">
+                                                Generated {new Date(latestContent.generatedAt).toLocaleString()}
+                                            </p>
+                                        )}
+                                    </div>
                                     <button onClick={refreshContent} disabled={isRefreshingContent} className="text-inkLight hover:text-gold transition-colors disabled:opacity-50">
                                         <RefreshCw className={`w-4 h-4 ${isRefreshingContent ? 'animate-spin text-gold' : ''}`} />
                                     </button>
@@ -531,7 +594,7 @@ export const AgentController: React.FC = () => {
                                         <motion.div key="thumbnail" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.15 }} className="flex justify-center">
                                             {latestContent.thumbnailLandscape ? (
                                                 <img
-                                                    src={getContentThumbnailUrl(latestContent.date.slice(0, 10), 'landscape')}
+                                                    src={getContentThumbnailUrl((latestContent.date || latestContent.generatedAt || '').slice(0, 10), 'landscape')}
                                                     alt="Generated thumbnail"
                                                     className="rounded-2xl max-w-full shadow-md"
                                                     onError={(e) => {

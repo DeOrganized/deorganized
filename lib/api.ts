@@ -3042,6 +3042,30 @@ export interface LogLine {
     message: string;
 }
 
+export interface GabbyConfig {
+    skip_content_gen: boolean;
+    skip_x_post: boolean;
+    skip_tips: boolean;
+}
+
+export const getSocialConfig = async (token: string): Promise<GabbyConfig> => {
+    const res = await fetch(`${API_BASE_URL}/agent/social/config/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch social agent config');
+    return res.json();
+};
+
+export const updateSocialConfig = async (token: string, patch: Partial<GabbyConfig>): Promise<GabbyConfig> => {
+    const res = await fetch(`${API_BASE_URL}/agent/social/config/`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+    });
+    if (!res.ok) throw new Error('Failed to update social agent config');
+    return res.json();
+};
+
 export const getSocialAgentLogs = async (token: string): Promise<{ lines: LogLine[] }> => {
     const res = await fetch(`${API_BASE_URL}/agent/social/logs/`, {
         headers: { Authorization: `Bearer ${token}` },
