@@ -519,35 +519,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                   )}
                </div>
 
-               {/* Membership / Points Card */}
-               <div className="bg-transparent border border-borderSubtle text-ink rounded-3xl p-6 shadow-soft relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-40 h-40 bg-gold rounded-full opacity-10 blur-[50px] -translate-y-1/2 translate-x-1/2" />
-
-                  <div className="relative z-10">
-                     <div className="flex justify-between items-start mb-6">
-                        <div className="bg-surface p-2 rounded-lg border border-borderSubtle">
-                           <Shield className="w-6 h-6 text-gold" />
-                        </div>
-                     </div>
-
-                     <h3 className="text-3xl font-bold mb-1">0</h3>
-                     <p className="text-ink/60 text-sm font-medium mb-6">DeOrg Points Coming Soon</p>
-
-                     <div className="space-y-3">
-                        <div className="flex justify-between text-xs font-medium">
-                           <span className="text-ink/60">Welcome Bonus Coming Soon</span>
-                           <span className="text-gold">0%</span>
-                        </div>
-                        <div className="w-full h-2 bg-surface rounded-full overflow-hidden border border-borderSubtle/50">
-                           <div className="h-full bg-gold w-[0%] rounded-full shadow-[0_0_10px_rgba(251,191,36,0.5)]" />
-                        </div>
-                     </div>
-
-                     <button className="w-full mt-6 bg-surface hover:bg-gold hover:text-white text-ink font-bold py-3 rounded-xl transition-all border border-borderSubtle shadow-sm">
-                        View Rewards
-                     </button>
-                  </div>
-               </div>
 
             </div>
 
