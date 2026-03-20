@@ -222,96 +222,6 @@ const AgentsPageInner: React.FC = () => {
                     </p>
                 </div>
 
-                {/* ── GABBY ──────────────────────────────────────────────────────── */}
-                <AgentSection
-                    icon={<Bot className="w-8 h-8 text-amber-500" />}
-                    name="Gabby"
-                    tagline="@DeOrganizedBTC · Social Agent · Stacks Mainnet"
-                    description="Gabby is DeOrganized's autonomous social agent. She generates crypto news, posts to X, and tips creators in sBTC and USDCx — all on Stacks mainnet, fully autonomous."
-                    accentClass="bg-amber-500/5"
-                >
-                    {/* Wallet */}
-                    <div>
-                        <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-sm font-semibold text-ink flex items-center gap-2">
-                                <Wallet className="w-4 h-4 text-amber-500" />
-                                Live Wallet Balances
-                            </h3>
-                            <a
-                                href={`https://explorer.hiro.so/address/${GABBY_STX_ADDRESS}?chain=mainnet`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-inkLight hover:text-gold flex items-center gap-1 transition-colors"
-                            >
-                                {GABBY_STX_ADDRESS.slice(0, 8)}…{GABBY_STX_ADDRESS.slice(-6)}
-                                <ExternalLink className="w-3 h-3" />
-                            </a>
-                        </div>
-                        {gabbyWalletLoading ? (
-                            <div className="flex items-center gap-2 text-inkLight text-sm">
-                                <Loader2 className="w-4 h-4 animate-spin" /> Loading balances from Hiro…
-                            </div>
-                        ) : gabbyWalletError ? (
-                            <p className="text-xs text-red-400">{gabbyWalletError}</p>
-                        ) : gabbyWallet ? (
-                            <div className="grid grid-cols-3 gap-3">
-                                <StatCard label="STX" value={parseFloat(gabbyWallet.stx).toFixed(2)} sub="Stacks" />
-                                <StatCard label="sBTC" value={parseFloat(gabbyWallet.sbtc) === 0 ? '0' : gabbyWallet.sbtc} sub="Synthetic BTC" />
-                                <StatCard label="USDCx" value={parseFloat(gabbyWallet.usdc) === 0 ? '0' : gabbyWallet.usdc} sub="Bridged USDC" />
-                            </div>
-                        ) : null}
-                    </div>
-
-                    {/* Latest Content */}
-                    <div>
-                        <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
-                            <RefreshCw className="w-4 h-4 text-amber-500" />
-                            Latest Generated Content
-                        </h3>
-                        {contentLoading ? (
-                            <div className="flex items-center gap-2 text-inkLight text-sm">
-                                <Loader2 className="w-4 h-4 animate-spin" /> Fetching latest pack…
-                            </div>
-                        ) : latestContent ? (
-                            <div className="bg-surface border border-borderSubtle rounded-xl overflow-hidden">
-                                {thumbnailDate && latestContent.thumbnailLandscape && (
-                                    <img
-                                        src={`${API_BASE_URL}/content/thumbnail/${thumbnailDate}/landscape/`}
-                                        alt="Content thumbnail"
-                                        className="w-full h-48 object-cover"
-                                        onError={e => { e.currentTarget.style.display = 'none'; }}
-                                    />
-                                )}
-                                <div className="p-5 space-y-2">
-                                    {latestContent.date && (
-                                        <p className="text-xs font-mono text-inkLight">{latestContent.date}</p>
-                                    )}
-                                    {latestContent.narrativeAngle && (
-                                        <p className="text-sm font-semibold text-ink">{latestContent.narrativeAngle}</p>
-                                    )}
-                                    {firstTweet && (
-                                        <p className="text-sm text-inkLight leading-relaxed line-clamp-4">{firstTweet}</p>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                            <p className="text-sm text-inkLight">No content generated yet.</p>
-                        )}
-                    </div>
-
-                    {/* X link */}
-                    <a
-                        href="https://x.com/DeOrganizedBTC"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-surface border border-borderSubtle hover:border-gold/40 rounded-full text-sm font-medium text-ink hover:text-gold transition-all"
-                    >
-                        <Twitter className="w-4 h-4" />
-                        See Gabby's latest posts @DeOrganizedBTC
-                        <ExternalLink className="w-3.5 h-3.5 text-inkLight" />
-                    </a>
-                </AgentSection>
-
                 {/* ── ELIO ──────────────────────────────────────────────────────── */}
                 <AgentSection
                     icon={<Bot className="w-8 h-8 text-gold" />}
@@ -445,6 +355,96 @@ const AgentsPageInner: React.FC = () => {
                             </button>
                         </div>
                     </div>
+                </AgentSection>
+
+                {/* ── GABBY ──────────────────────────────────────────────────────── */}
+                <AgentSection
+                    icon={<Bot className="w-8 h-8 text-amber-500" />}
+                    name="Gabby"
+                    tagline="@DeOrganizedBTC · Social Agent · Stacks Mainnet"
+                    description="Gabby is DeOrganized's autonomous social agent. She generates crypto news, posts to X, and tips creators in sBTC and USDCx — all on Stacks mainnet, fully autonomous."
+                    accentClass="bg-amber-500/5"
+                >
+                    {/* Wallet */}
+                    <div>
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-semibold text-ink flex items-center gap-2">
+                                <Wallet className="w-4 h-4 text-amber-500" />
+                                Live Wallet Balances
+                            </h3>
+                            <a
+                                href={`https://explorer.hiro.so/address/${GABBY_STX_ADDRESS}?chain=mainnet`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-inkLight hover:text-gold flex items-center gap-1 transition-colors"
+                            >
+                                {GABBY_STX_ADDRESS.slice(0, 8)}…{GABBY_STX_ADDRESS.slice(-6)}
+                                <ExternalLink className="w-3 h-3" />
+                            </a>
+                        </div>
+                        {gabbyWalletLoading ? (
+                            <div className="flex items-center gap-2 text-inkLight text-sm">
+                                <Loader2 className="w-4 h-4 animate-spin" /> Loading balances from Hiro…
+                            </div>
+                        ) : gabbyWalletError ? (
+                            <p className="text-xs text-red-400">{gabbyWalletError}</p>
+                        ) : gabbyWallet ? (
+                            <div className="grid grid-cols-3 gap-3">
+                                <StatCard label="STX" value={parseFloat(gabbyWallet.stx).toFixed(2)} sub="Stacks" />
+                                <StatCard label="sBTC" value={parseFloat(gabbyWallet.sbtc) === 0 ? '0' : gabbyWallet.sbtc} sub="Synthetic BTC" />
+                                <StatCard label="USDCx" value={parseFloat(gabbyWallet.usdc) === 0 ? '0' : gabbyWallet.usdc} sub="Bridged USDC" />
+                            </div>
+                        ) : null}
+                    </div>
+
+                    {/* Latest Content */}
+                    <div>
+                        <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
+                            <RefreshCw className="w-4 h-4 text-amber-500" />
+                            Latest Generated Content
+                        </h3>
+                        {contentLoading ? (
+                            <div className="flex items-center gap-2 text-inkLight text-sm">
+                                <Loader2 className="w-4 h-4 animate-spin" /> Fetching latest pack…
+                            </div>
+                        ) : latestContent ? (
+                            <div className="bg-surface border border-borderSubtle rounded-xl overflow-hidden">
+                                {thumbnailDate && latestContent.thumbnailLandscape && (
+                                    <img
+                                        src={`${API_BASE_URL}/content/thumbnail/${thumbnailDate}/landscape/`}
+                                        alt="Content thumbnail"
+                                        className="w-full h-48 object-cover"
+                                        onError={e => { e.currentTarget.style.display = 'none'; }}
+                                    />
+                                )}
+                                <div className="p-5 space-y-2">
+                                    {latestContent.date && (
+                                        <p className="text-xs font-mono text-inkLight">{latestContent.date}</p>
+                                    )}
+                                    {latestContent.narrativeAngle && (
+                                        <p className="text-sm font-semibold text-ink">{latestContent.narrativeAngle}</p>
+                                    )}
+                                    {firstTweet && (
+                                        <p className="text-sm text-inkLight leading-relaxed line-clamp-4">{firstTweet}</p>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-inkLight">No content generated yet.</p>
+                        )}
+                    </div>
+
+                    {/* X link */}
+                    <a
+                        href="https://x.com/DeOrganizedBTC"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-surface border border-borderSubtle hover:border-gold/40 rounded-full text-sm font-medium text-ink hover:text-gold transition-all"
+                    >
+                        <Twitter className="w-4 h-4" />
+                        See Gabby's latest posts @DeOrganizedBTC
+                        <ExternalLink className="w-3.5 h-3.5 text-inkLight" />
+                    </a>
                 </AgentSection>
 
             </div>
