@@ -3099,6 +3099,27 @@ export const runSocialStacks = async (token: string): Promise<SocialRunResult> =
     return { ...(await res.json()), _status: res.status } as any;
 };
 
+// --- Public Agent Endpoints (no auth — used by /agents showcase page) ---
+
+export const getPublicElioWallet = async (): Promise<ElioWallet> => {
+    const res = await fetch(`${API_BASE_URL}/public/agent/wallet/`);
+    if (!res.ok) throw new Error('Failed to fetch Elio wallet');
+    return res.json();
+};
+
+export const publicChatWithElio = async (message: string): Promise<ChatResponse> => {
+    const res = await fetch(`${API_BASE_URL}/public/agent/chat/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+    });
+    if (res.status === 429) {
+        throw Object.assign(new Error('Rate limit reached — please wait a moment before sending another message.'), { status: 429 });
+    }
+    if (!res.ok) throw new Error('Failed to chat with Elio');
+    return res.json();
+};
+
 // --- News Production (admin direct trigger, no DAP credits) ---
 
 export const triggerNewsGeneration = async (

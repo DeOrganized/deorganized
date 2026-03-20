@@ -5,7 +5,7 @@ interface FooterProps {
   onNavigate?: (page: string) => void;
 }
 
-export const Footer: React.FC<FooterProps> = () => {
+export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
   return (
     <footer className="bg-canvas border-t border-borderSubtle py-8">
       <div className="container max-w-[1280px] mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -13,6 +13,14 @@ export const Footer: React.FC<FooterProps> = () => {
           © 2026 DeOrganized. Built on Bitcoin. Powered by Stacks.
         </p>
         <div className="flex items-center gap-5">
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('agents')}
+              className="text-xs text-inkLight hover:text-gold transition-colors font-medium"
+            >
+              Meet the Agents
+            </button>
+          )}
           <a
             href="https://x.com/DeOrganizedBTC"
             target="_blank"
