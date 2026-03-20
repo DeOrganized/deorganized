@@ -155,6 +155,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
     { label: 'Creators', id: 'creators' },
     { label: 'Community', id: 'community' },
     { label: 'Calendar', id: 'event-calendar' },
+    { label: 'DAPs', id: 'daps' },
     { label: 'Meet the Agents', id: 'agents' },
   ];
 

@@ -14,12 +14,20 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         </p>
         <div className="flex items-center gap-5">
           {onNavigate && (
-            <button
-              onClick={() => onNavigate('agents')}
-              className="text-xs text-inkLight hover:text-gold transition-colors font-medium"
-            >
-              Meet the Agents
-            </button>
+            <>
+              <button
+                onClick={() => onNavigate('daps')}
+                className="text-xs text-inkLight hover:text-gold transition-colors font-medium"
+              >
+                DAPs
+              </button>
+              <button
+                onClick={() => onNavigate('agents')}
+                className="text-xs text-inkLight hover:text-gold transition-colors font-medium"
+              >
+                Meet the Agents
+              </button>
+            </>
           )}
           <a
             href="https://x.com/DeOrganizedBTC"

@@ -18,10 +18,11 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { CommunityFeed } from './components/CommunityFeed';
 import { PlayoutControl } from './components/PlayoutControl';
 import { AgentsPage } from './components/AgentsPage';
+import { DAPsPage } from './components/DAPsPage';
 import { ToastProvider } from './components/Toast';
 
 
-type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents';
+type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps';
 
 // Map URL paths to page views and extract IDs
 function parseUrl(pathname: string): { page: PageView; id: string | number | null } {
@@ -52,6 +53,8 @@ function parseUrl(pathname: string): { page: PageView; id: string | number | nul
       return { page: 'register', id: null };
     case 'agents':
       return { page: 'agents', id: null };
+    case 'daps':
+      return { page: 'daps', id: null };
     default:
       return { page: 'home', id: null };
   }
@@ -74,6 +77,7 @@ function pageToUrl(page: PageView, id?: string | number | null): string {
     case 'playout-control': return '/playout';
     case 'register': return '/register';
     case 'agents': return '/agents';
+    case 'daps': return '/daps';
     case 'home':
     default: return '/';
   }
@@ -148,6 +152,8 @@ const AppContent: React.FC = () => {
         return <ProfileSetup onNavigate={handleNavigate} />;
       case 'agents':
         return <AgentsPage />;
+      case 'daps':
+        return <DAPsPage onNavigate={handleNavigate} />;
       case 'home':
       default:
         return <Hero onNavigate={handleNavigate} />;
