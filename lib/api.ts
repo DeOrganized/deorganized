@@ -3116,8 +3116,17 @@ export const publicChatWithElio = async (message: string): Promise<ChatResponse>
     if (res.status === 429) {
         throw Object.assign(new Error('Rate limit reached — please wait a moment before sending another message.'), { status: 429 });
     }
-    if (!res.ok) throw new Error('Failed to chat with Elio');
-    return res.json();
+    // Parse JSON safely — the server might return HTML on unexpected errors
+    let data: any;
+    try {
+        data = await res.json();
+    } catch {
+        throw new Error(`Server returned non-JSON response (HTTP ${res.status})`);
+    }
+    if (!res.ok) {
+        throw new Error(data?.error || data?.detail || `Elio is unavailable right now (HTTP ${res.status})`);
+    }
+    return data;
 };
 
 // --- News Production (admin direct trigger, no DAP credits) ---

@@ -1,6 +1,40 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Component, ErrorInfo, ReactNode } from 'react';
 import { Twitter, Send, Loader2, Wallet, Zap, Bot, ExternalLink, RefreshCw } from 'lucide-react';
 import { API_BASE_URL, getPublicElioWallet, publicChatWithElio, ElioWallet, ContentPackage } from '../lib/api';
+
+// ─── Error boundary (prevents white-screen crashes from any child error) ─────
+
+class AgentsErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
+    constructor(props: { children: ReactNode }) {
+        super(props);
+        this.state = { error: null };
+    }
+    static getDerivedStateFromError(err: Error) {
+        return { error: err?.message || 'An unexpected error occurred.' };
+    }
+    componentDidCatch(err: Error, info: ErrorInfo) {
+        console.error('[AgentsPage] render error:', err, info);
+    }
+    render() {
+        if (this.state.error) {
+            return (
+                <div className="min-h-screen bg-canvas pt-24 pb-16 flex items-center justify-center">
+                    <div className="text-center space-y-3 max-w-md px-6">
+                        <p className="text-inkLight text-sm">Something went wrong loading this page.</p>
+                        <p className="text-xs font-mono text-red-400">{this.state.error}</p>
+                        <button
+                            onClick={() => { this.setState({ error: null }); window.location.reload(); }}
+                            className="text-sm text-gold hover:underline"
+                        >
+                            Reload
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
 
 const GABBY_STX_ADDRESS = 'SPV0NQCPFMQJ0PPYHAQXXF3VSM64W4WBZ4XYYHNW';
 const HIRO_API = 'https://api.hiro.so';
@@ -80,7 +114,7 @@ const AgentSection: React.FC<{
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export const AgentsPage: React.FC = () => {
+const AgentsPageInner: React.FC = () => {
     // Gabby
     const [gabbyWallet, setGabbyWallet] = useState<GabbyWallet | null>(null);
     const [gabbyWalletLoading, setGabbyWalletLoading] = useState(true);
@@ -135,9 +169,18 @@ export const AgentsPage: React.FC = () => {
         setChatLoading(true);
         try {
             const data = await publicChatWithElio(text);
-            setMessages(prev => [...prev, { role: 'elio', text: data.response.reply }]);
-        } catch (e: any) {
-            setChatError(e.message || 'Something went wrong. Please try again.');
+            // Defensive access — response shape may vary if the agent is under load
+            const reply: string =
+                (data as any)?.response?.reply ||
+                (data as any)?.reply ||
+                (data as any)?.message ||
+                'Elio is unavailable right now. Please try again in a moment.';
+            setMessages(prev => [...prev, { role: 'elio', text: reply }]);
+        } catch (e: unknown) {
+            const msg = e instanceof Error
+                ? e.message
+                : 'Elio is unavailable right now. Please try again.';
+            setChatError(msg);
         } finally {
             setChatLoading(false);
             setTimeout(() => inputRef.current?.focus(), 100);
@@ -408,3 +451,9 @@ export const AgentsPage: React.FC = () => {
         </div>
     );
 };
+
+export const AgentsPage: React.FC = () => (
+    <AgentsErrorBoundary>
+        <AgentsPageInner />
+    </AgentsErrorBoundary>
+);
