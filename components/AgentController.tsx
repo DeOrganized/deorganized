@@ -463,7 +463,7 @@ export const AgentController: React.FC = () => {
                                     </div>
                                     <div className="grid grid-cols-2 gap-2">
                                         <div className="bg-surface rounded-xl p-3">
-                                            <p className="text-xs font-black text-inkLight uppercase tracking-wider mb-1">DAP Credits</p>
+                                            <a href="/daps" className="text-xs font-black text-inkLight uppercase tracking-wider mb-1 hover:text-gold transition-colors block">DAP Credits</a>
                                             <p className="text-lg font-black text-gold">{socialDapBalance}</p>
                                         </div>
                                         <div className="bg-surface rounded-xl p-3">

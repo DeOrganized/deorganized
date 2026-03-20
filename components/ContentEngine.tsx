@@ -349,6 +349,7 @@ export const ContentEngine: React.FC = () => {
                                                 Cancel
                                             </button>
                                         </div>
+                                        <a href="/daps" className="text-xs text-inkLight hover:text-gold transition-colors">What are DAP credits?</a>
                                     </div>
                                 ) : (
                                     <button
@@ -414,7 +415,7 @@ export const ContentEngine: React.FC = () => {
                     </div>
 
                     {/* Package selector */}
-                    <div className="space-y-2 mb-5">
+                    <div className="space-y-2 mb-2">
                         {(['news-package', 'stacks-package'] as const).map((pkg) => (
                             <button
                                 key={pkg}
@@ -427,10 +428,13 @@ export const ContentEngine: React.FC = () => {
                             >
                                 <span>{pkg === 'news-package' ? 'News Package' : 'Stacks Package'}</span>
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-black ${serviceType === pkg ? 'bg-gold text-white' : 'bg-surface text-inkLight'}`}>
-                                    {PACKAGE_COSTS[pkg]} cr
+                                    {PACKAGE_COSTS[pkg]} credits
                                 </span>
                             </button>
                         ))}
+                    </div>
+                    <div className="mb-5 text-right">
+                        <a href="/daps" className="text-xs text-inkLight hover:text-gold transition-colors">What are DAP credits?</a>
                     </div>
 
                     {generationError && (

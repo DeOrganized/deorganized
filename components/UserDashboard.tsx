@@ -326,15 +326,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                         {isDAPRegistered && dapUser && dapStatus ? (
                            <>
                               <div className="flex items-center justify-between bg-gold/5 border border-gold/20 rounded-xl px-4 py-3">
-                                 <div>
+                                 <a href="/daps" className="group">
                                     <div className="flex items-center gap-2 mb-0.5">
                                        <Coins className="w-4 h-4 text-gold" />
-                                       <span className="text-xs font-semibold text-inkLight uppercase tracking-wider">DAP Credits</span>
+                                       <span className="text-xs font-semibold text-inkLight uppercase tracking-wider group-hover:text-gold transition-colors">DAP Credits</span>
                                     </div>
                                     <span className="text-3xl font-bold text-gold">
                                        {dapBalance ? Number(dapBalance.balance).toLocaleString() : '—'}
                                     </span>
-                                 </div>
+                                 </a>
                                  {depositPending ? (
                                     <div className="flex items-center gap-1.5 text-xs font-semibold text-gold bg-gold/10 border border-gold/20 px-3 py-2 rounded-xl">
                                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Deposit pending…
@@ -361,6 +361,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                                        <p className="text-[10px] text-inkLight">
                                           = {(parseFloat(stxAmount) * 100 || 0).toLocaleString()} credits
                                        </p>
+                                       <a href="/daps" className="text-[10px] text-inkLight hover:text-gold transition-colors">What are DAP credits?</a>
                                     </div>
                                  )}
                               </div>
