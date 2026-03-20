@@ -168,7 +168,9 @@ export const AgentController: React.FC = () => {
 
     useEffect(() => {
         const el = logContainerRef.current;
-        if (el) el.scrollTop = el.scrollHeight;
+        if (!el) return;
+        const isNearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 50;
+        if (isNearBottom) el.scrollTop = el.scrollHeight;
     }, [gabbyLogs]);
 
     useEffect(() => {

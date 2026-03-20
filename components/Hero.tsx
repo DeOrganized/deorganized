@@ -8,7 +8,7 @@ interface HeroProps {
 }
 
 export const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
-  const { connectWallet } = useAuth();
+  const { connectWallet, isBackendAuthenticated } = useAuth();
 
   return (
     <>
@@ -82,10 +82,10 @@ export const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
             className="flex flex-col sm:flex-row items-center gap-4"
           >
             <button
-              onClick={() => connectWallet()}
+              onClick={() => isBackendAuthenticated ? onNavigate?.('dashboard') : connectWallet()}
               className="bg-gold-gradient text-white font-bold px-8 py-4 rounded-full shadow-lg shadow-gold/20 hover:shadow-gold/40 transition-all hover:-translate-y-1"
             >
-              Connect Wallet
+              {isBackendAuthenticated ? 'My Dashboard' : 'Connect Wallet'}
             </button>
             <button
               onClick={() => onNavigate?.('dashboard', 'content-engine')}
@@ -439,10 +439,10 @@ export const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <button
-                onClick={() => connectWallet()}
+                onClick={() => isBackendAuthenticated ? onNavigate?.('dashboard') : connectWallet()}
                 className="bg-gold-gradient text-white font-bold px-8 py-4 rounded-full shadow-lg shadow-gold/20 hover:shadow-gold/40 transition-all hover:-translate-y-1"
               >
-                Connect Wallet
+                {isBackendAuthenticated ? 'My Dashboard' : 'Connect Wallet'}
               </button>
               <button
                 onClick={() => onNavigate?.('shows')}

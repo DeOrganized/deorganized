@@ -131,7 +131,7 @@ const AgentsPageInner: React.FC = () => {
     const [chatLoading, setChatLoading] = useState(false);
     const [chatError, setChatError] = useState<string | null>(null);
 
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
     // ── Data fetching ──────────────────────────────────────────────────────
@@ -155,7 +155,8 @@ const AgentsPageInner: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        const el = messagesContainerRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
     }, [messages, chatLoading]);
 
     // ── Chat ──────────────────────────────────────────────────────────────
@@ -183,7 +184,7 @@ const AgentsPageInner: React.FC = () => {
             setChatError(msg);
         } finally {
             setChatLoading(false);
-            setTimeout(() => inputRef.current?.focus(), 100);
+            setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 100);
         }
     };
 
@@ -295,7 +296,7 @@ const AgentsPageInner: React.FC = () => {
                         </h3>
 
                         {/* Message list */}
-                        <div className="bg-surface border border-borderSubtle rounded-xl p-4 h-72 overflow-y-auto flex flex-col gap-3 mb-3">
+                        <div ref={messagesContainerRef} className="bg-surface border border-borderSubtle rounded-xl p-4 h-72 overflow-y-auto flex flex-col gap-3 mb-3">
                             {messages.length === 0 && (
                                 <div className="flex-1 flex items-center justify-center text-center text-sm text-inkLight">
                                     <div>
@@ -331,7 +332,6 @@ const AgentsPageInner: React.FC = () => {
                             {chatError && (
                                 <p className="text-xs text-red-400 text-center px-4">{chatError}</p>
                             )}
-                            <div ref={messagesEndRef} />
                         </div>
 
                         {/* Input */}
