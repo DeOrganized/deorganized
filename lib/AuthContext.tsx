@@ -13,6 +13,8 @@ import {
     storePendingWallet,
     isTokenExpired,
     refreshAccessToken,
+    storeWalletCredentials,
+    getWalletCredentials,
     User,
     CompleteSetupPayload
 } from './walletAuth';
@@ -67,8 +69,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const savedToken = getAccessToken();
             const savedUser = getStoredUser();
 
-            // Nothing stored — not logged in
-            if (!savedToken || !savedUser) return;
+            // Nothing stored — attempt silent re-auth with persisted wallet credentials
+            if (!savedToken || !savedUser) {
+                const creds = getWalletCredentials();
+                if (creds) {
+                    console.log('🔵 [AUTH] No JWT found — attempting silent re-auth with stored credentials');
+                    try {
+                        const result = await checkWalletOrLogin(
+                            creds.userAddress,
+                            creds.signedMessageText,
+                            creds.signedMessage,
+                        );
+                        if (!result.is_new && result.tokens && result.user) {
+                            storeTokens(result.tokens);
+                            storeUser(result.user);
+                            // Refresh the stored credentials with the fresh tokens
+                            storeWalletCredentials(creds.userAddress, creds.signedMessageText, creds.signedMessage);
+                            setAccessToken(result.tokens.access);
+                            setBackendUser(result.user);
+                            console.log('✅ [AUTH] Silent re-auth succeeded');
+                        } else {
+                            // Backend rejected the stored credentials — clear them
+                            clearAuth();
+                            console.warn('⚠️ [AUTH] Silent re-auth rejected — clearing stored credentials');
+                        }
+                    } catch {
+                        // Network error or backend rejection — clear stale credentials
+                        clearAuth();
+                        console.warn('⚠️ [AUTH] Silent re-auth failed — credentials cleared');
+                    }
+                }
+                return;
+            }
 
             // Access token still valid — restore session
             if (!isTokenExpired(savedToken)) {
@@ -195,6 +227,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     console.log('🟢 [AUTH] Storing tokens and user data...');
                     storeTokens(result.tokens);
                     storeUser(result.user);
+                    storeWalletCredentials(userData.address, message, signature);
                     setAccessToken(result.tokens.access);
                     setBackendUser(result.user);
                     console.log('🟢 [AUTH] Calling onExistingUser callback...');

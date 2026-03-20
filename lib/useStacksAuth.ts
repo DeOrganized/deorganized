@@ -84,6 +84,9 @@ export const useStacksAuth = (): UseStacksAuthReturn => {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user_profile');
+        localStorage.removeItem('userAddress');
+        localStorage.removeItem('signedMessage');
+        localStorage.removeItem('signedMessageText');
     };
 
     return {

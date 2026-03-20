@@ -249,28 +249,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 {backendUser.username}
               </button>
 
-              {/* Logout */}
+              {/* Disconnect */}
               <button
                 onClick={logout}
                 className="text-sm font-medium text-inkLight hover:text-gold transition-colors"
               >
-                Logout
+                Disconnect
               </button>
             </>
-          ) : isWalletConnected && walletAddress && !isAuthenticating && !authError ? (
-            <>
-              {/* Wallet connected but not registered */}
-              <div className="flex items-center gap-2 px-4 py-2 bg-surface border border-borderSubtle rounded-full">
-                <Wallet className="w-4 h-4 text-gold" />
-                <span className="text-sm font-medium text-ink">{getWalletDisplay()}</span>
-              </div>
-              <button
-                onClick={() => handleNavClick('register')}
-                className="bg-gold hover:bg-gold/90 text-white px-6 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 shadow-md"
-              >
-                Complete Setup
-              </button>
-            </>
+          ) : isWalletConnected ? (
+            <button
+              onClick={logout}
+              className="bg-canvas border border-borderSubtle hover:border-gold/50 text-ink hover:text-gold px-6 py-2.5 rounded-full text-sm font-semibold transition-all duration-300"
+            >
+              Disconnect
+            </button>
           ) : (
             /* Connect Wallet button */
             <button
@@ -328,15 +321,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 onClick={logout}
                 className="text-lg font-medium text-left text-inkLight hover:text-gold"
               >
-                Logout
+                Disconnect
               </button>
             </>
-          ) : isWalletConnected && !isAuthenticating && !authError ? (
+          ) : isWalletConnected ? (
             <button
-              onClick={() => handleNavClick('register')}
-              className="bg-gold hover:bg-gold/90 text-white px-6 py-3 rounded-full text-lg font-semibold"
+              onClick={logout}
+              className="text-lg font-medium text-left text-inkLight hover:text-gold"
             >
-              Complete Setup
+              Disconnect
             </button>
           ) : (
             <button

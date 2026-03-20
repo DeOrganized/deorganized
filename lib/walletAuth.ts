@@ -188,7 +188,32 @@ export function clearAuth(): void {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
+    localStorage.removeItem('userAddress');
+    localStorage.removeItem('signedMessage');
+    localStorage.removeItem('signedMessageText');
     sessionStorage.removeItem('pending_wallet_address');
+}
+
+/**
+ * Persist the wallet address + signature pair that proved ownership.
+ * Stored so subsequent sessions can attempt silent re-authentication
+ * without prompting the wallet again.
+ */
+export function storeWalletCredentials(address: string, message: string, signature: string): void {
+    localStorage.setItem('userAddress', address);
+    localStorage.setItem('signedMessage', signature);
+    localStorage.setItem('signedMessageText', message);
+}
+
+/**
+ * Retrieve persisted wallet credentials, or null if any are missing.
+ */
+export function getWalletCredentials(): { userAddress: string; signedMessage: string; signedMessageText: string } | null {
+    const userAddress      = localStorage.getItem('userAddress');
+    const signedMessage    = localStorage.getItem('signedMessage');
+    const signedMessageText = localStorage.getItem('signedMessageText');
+    if (!userAddress || !signedMessage || !signedMessageText) return null;
+    return { userAddress, signedMessage, signedMessageText };
 }
 
 /**
