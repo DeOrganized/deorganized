@@ -248,21 +248,38 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
     return (
         <div className="max-w-5xl mx-auto">
             {/* Banner */}
-            <div className="h-48 bg-surface relative">
-                {community.banner && (
+            <div className="h-56 relative overflow-hidden rounded-b-none">
+                {community.banner ? (
                     <img
                         src={getImageUrl(community.banner) || ''}
                         alt=""
                         className="w-full h-full object-cover"
                     />
+                ) : (
+                    /* Gradient fallback when no banner image */
+                    <div
+                        className="w-full h-full"
+                        style={{
+                            background: `linear-gradient(135deg,
+                                hsl(${(community.name.charCodeAt(0) * 7) % 360}, 40%, 18%) 0%,
+                                hsl(${(community.name.charCodeAt(0) * 7 + 60) % 360}, 30%, 12%) 50%,
+                                hsl(43, 74%, 14%) 100%)`,
+                        }}
+                    >
+                        <div className="absolute inset-0 flex items-center justify-center opacity-10">
+                            <span className="text-[120px] font-black text-white select-none">
+                                {community.name[0]?.toUpperCase()}
+                            </span>
+                        </div>
+                    </div>
                 )}
             </div>
 
-            {/* Header */}
+            {/* Header — avatar overlaps banner bottom edge */}
             <div className="px-4 sm:px-6">
-                <div className="flex items-end justify-between -mt-8 mb-4">
-                    {/* Avatar */}
-                    <div className="w-16 h-16 rounded-2xl border-4 border-canvas bg-surface overflow-hidden flex items-center justify-center shrink-0">
+                <div className="flex items-end justify-between -mt-12 mb-5">
+                    {/* Avatar — larger, overlapping the banner */}
+                    <div className="w-24 h-24 rounded-2xl border-4 border-canvas bg-surface overflow-hidden flex items-center justify-center shrink-0 shadow-lg">
                         {community.avatar ? (
                             <img
                                 src={getImageUrl(community.avatar) || ''}
@@ -270,7 +287,7 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
                                 className="w-full h-full object-cover"
                             />
                         ) : (
-                            <span className="text-2xl font-black text-inkLight">
+                            <span className="text-4xl font-black text-inkLight">
                                 {community.name[0]?.toUpperCase()}
                             </span>
                         )}
@@ -307,14 +324,9 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
 
                 {/* Community info */}
                 <div className="mb-4">
-                    <div className="flex items-center gap-2 mb-1">
-                        <h1 className="text-xl font-black text-ink">{community.name}</h1>
-                        <span className="text-xs font-black text-inkLight bg-surface px-2 py-0.5 rounded-full uppercase">
-                            {community.tier}
-                        </span>
-                    </div>
+                    <h1 className="text-2xl font-black text-ink mb-1">{community.name}</h1>
                     {community.description && (
-                        <p className="text-sm text-inkLight mb-3">{community.description}</p>
+                        <p className="text-sm text-inkLight mb-3 max-w-2xl leading-relaxed">{community.description}</p>
                     )}
                     <div className="flex flex-wrap items-center gap-4 text-xs text-inkLight">
                         <span className="flex items-center gap-1">
@@ -322,7 +334,17 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
                             {community.member_count} member{community.member_count !== 1 ? 's' : ''}
                         </span>
                         {community.founder && (
-                            <span>Founded by <strong className="text-ink">{community.founder.username}</strong></span>
+                            <span className="flex items-center gap-1.5">
+                                Founded by{' '}
+                                {community.founder.profile_picture && (
+                                    <img
+                                        src={getImageUrl(community.founder.profile_picture) || ''}
+                                        alt={community.founder.username}
+                                        className="w-4 h-4 rounded-full object-cover"
+                                    />
+                                )}
+                                <strong className="text-ink">{community.founder.username}</strong>
+                            </span>
                         )}
                         {community.website && (
                             <a
