@@ -3152,3 +3152,200 @@ export const triggerNewsGeneration = async (
     if (!res.ok) throw new Error('Failed to trigger generation');
     return res.json();
 };
+
+// ─── Community Types ──────────────────────────────────────────────────────────
+
+export interface UserSummary {
+    id: number;
+    username: string;
+    display_name: string | null;
+    profile_picture: string | null;
+    is_verified: boolean;
+}
+
+export interface Community {
+    id: number;
+    name: string;
+    slug: string;
+    description: string;
+    avatar: string | null;
+    banner: string | null;
+    tier: 'free' | 'creator' | 'pro' | 'enterprise';
+    website: string | null;
+    twitter: string | null;
+    agent_api_url: string | null;
+    created_by: number;
+    created_at: string;
+    updated_at: string;
+    member_count: number;
+    founder: UserSummary | null;
+    user_membership: { id: number; role: MembershipRole; joined_at: string } | null;
+    user_is_following: boolean;
+}
+
+export type MembershipRole = 'founder' | 'admin' | 'moderator' | 'member';
+
+export interface Membership {
+    id: number;
+    user: UserSummary;
+    community: number;
+    role: MembershipRole;
+    joined_at: string;
+}
+
+export interface MembershipWithCommunity {
+    id: number;
+    role: MembershipRole;
+    joined_at: string;
+    community: Community;
+}
+
+// ─── Community API Functions ──────────────────────────────────────────────────
+
+export const getCommunities = async (
+    params?: { search?: string; ordering?: string; page?: number },
+    accessToken?: string
+): Promise<{ count: number; results: Community[] }> => {
+    const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])).toString() : '';
+    const headers: HeadersInit = {};
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const res = await fetch(`${API_BASE_URL}/communities/${qs}`, { headers });
+    if (!res.ok) throw new Error('Failed to fetch communities');
+    return res.json();
+};
+
+export const getCommunity = async (slug: string, accessToken?: string): Promise<Community> => {
+    const headers: HeadersInit = {};
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/`, { headers });
+    if (!res.ok) throw new Error('Failed to fetch community');
+    return res.json();
+};
+
+export const createCommunity = async (data: FormData, accessToken: string): Promise<Community> => {
+    const res = await fetch(`${API_BASE_URL}/communities/`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: data,
+    });
+    if (!res.ok) throw new Error('Failed to create community');
+    return res.json();
+};
+
+export const updateCommunity = async (slug: string, data: FormData, accessToken: string): Promise<Community> => {
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: data,
+    });
+    if (!res.ok) throw new Error('Failed to update community');
+    return res.json();
+};
+
+export const deleteCommunity = async (slug: string, accessToken: string): Promise<void> => {
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) throw new Error('Failed to delete community');
+};
+
+export const getMyCommunities = async (accessToken: string): Promise<MembershipWithCommunity[]> => {
+    const res = await fetch(`${API_BASE_URL}/communities/my_communities/`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch my communities');
+    return res.json();
+};
+
+export const getCommunityFeed = async (slug: string, page = 1, accessToken?: string) => {
+    const headers: HeadersInit = {};
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/feed/?page=${page}`, { headers });
+    if (!res.ok) throw new Error('Failed to fetch community feed');
+    return res.json();
+};
+
+export const getCommunityShows = async (slug: string, accessToken?: string) => {
+    const headers: HeadersInit = {};
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/shows/`, { headers });
+    if (!res.ok) throw new Error('Failed to fetch community shows');
+    return res.json();
+};
+
+export const getCommunityEvents = async (slug: string, accessToken?: string) => {
+    const headers: HeadersInit = {};
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/events/`, { headers });
+    if (!res.ok) throw new Error('Failed to fetch community events');
+    return res.json();
+};
+
+export const getCommunityMerch = async (slug: string, accessToken?: string) => {
+    const headers: HeadersInit = {};
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/merch/`, { headers });
+    if (!res.ok) throw new Error('Failed to fetch community merch');
+    return res.json();
+};
+
+export const getCommunityMembers = async (slug: string, accessToken?: string): Promise<Membership[]> => {
+    const headers: HeadersInit = {};
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/members/`, { headers });
+    if (!res.ok) throw new Error('Failed to fetch community members');
+    return res.json();
+};
+
+export const joinCommunity = async (slug: string, accessToken: string): Promise<Membership> => {
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/members/`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) throw new Error('Failed to join community');
+    return res.json();
+};
+
+export const leaveCommunity = async (slug: string, membershipId: number, accessToken: string): Promise<void> => {
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/members/${membershipId}/`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) throw new Error('Failed to leave community');
+};
+
+export const updateMemberRole = async (
+    slug: string,
+    membershipId: number,
+    role: MembershipRole,
+    accessToken: string
+): Promise<Membership> => {
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/members/${membershipId}/`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+    });
+    if (!res.ok) throw new Error('Failed to update member role');
+    return res.json();
+};
+
+export const toggleCommunityFollow = async (
+    slug: string,
+    accessToken: string
+): Promise<{ following: boolean }> => {
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/follow/`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) throw new Error('Failed to toggle community follow');
+    return res.json();
+};
+
+export const getCommunityFollowers = async (slug: string, accessToken?: string) => {
+    const headers: HeadersInit = {};
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/followers/`, { headers });
+    if (!res.ok) throw new Error('Failed to fetch community followers');
+    return res.json();
+};

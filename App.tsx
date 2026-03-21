@@ -20,9 +20,13 @@ import { PlayoutControl } from './components/PlayoutControl';
 import { AgentsPage } from './components/AgentsPage';
 import { DAPsPage } from './components/DAPsPage';
 import { ToastProvider } from './components/Toast';
+import { CommunityPage } from './components/communities/CommunityPage';
+import { CommunitiesDiscovery } from './components/communities/CommunitiesDiscovery';
+import { CreateCommunity } from './components/communities/CreateCommunity';
+import { CommunityManage } from './components/communities/CommunityManage';
 
 
-type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps';
+type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps' | 'communities' | 'community-page' | 'community-manage' | 'create-community';
 
 // Map URL paths to page views and extract IDs
 function parseUrl(pathname: string): { page: PageView; id: string | number | null } {
@@ -55,6 +59,14 @@ function parseUrl(pathname: string): { page: PageView; id: string | number | nul
       return { page: 'agents', id: null };
     case 'daps':
       return { page: 'daps', id: null };
+    case 'communities':
+      return { page: 'communities', id: null };
+    case 'create-community':
+      return { page: 'create-community', id: null };
+    case 'c':
+      if (!param) return { page: 'communities', id: null };
+      if (parts[2] === 'manage') return { page: 'community-manage', id: param };
+      return { page: 'community-page', id: param };
     default:
       return { page: 'home', id: null };
   }
@@ -78,6 +90,10 @@ function pageToUrl(page: PageView, id?: string | number | null): string {
     case 'register': return '/register';
     case 'agents': return '/agents';
     case 'daps': return '/daps';
+    case 'communities': return '/communities';
+    case 'community-page': return `/c/${id}`;
+    case 'community-manage': return `/c/${id}/manage`;
+    case 'create-community': return '/create-community';
     case 'home':
     default: return '/';
   }
@@ -154,6 +170,14 @@ const AppContent: React.FC = () => {
         return <AgentsPage />;
       case 'daps':
         return <DAPsPage onNavigate={handleNavigate} />;
+      case 'communities':
+        return <CommunitiesDiscovery onNavigate={handleNavigate} />;
+      case 'community-page':
+        return selectedId ? <CommunityPage onNavigate={handleNavigate} slug={String(selectedId)} /> : <div>Community not found</div>;
+      case 'community-manage':
+        return selectedId ? <CommunityManage onNavigate={handleNavigate} slug={String(selectedId)} /> : <div>Community not found</div>;
+      case 'create-community':
+        return <CreateCommunity onNavigate={handleNavigate} />;
       case 'home':
       default:
         return <Hero onNavigate={handleNavigate} />;
