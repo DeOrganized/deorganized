@@ -3,7 +3,7 @@ import {
    User, Settings, Clock, Heart, Shield, Zap,
    LogOut, Play, MoreHorizontal, MessageSquare,
    ThumbsUp, ExternalLink, CreditCard, Award, Loader2,
-   UserPlus, Share2, Bell, Crown, Calendar,
+   UserPlus, Share2, Bell, Crown, Calendar, Users,
    Wallet, Coins, Copy, Check, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { request } from '@stacks/connect';
