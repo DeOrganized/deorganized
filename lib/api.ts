@@ -2884,6 +2884,7 @@ export interface SocialAgentWallet {
     sbtc: { sats: number; btc: number };
     usdcx: { micro: number; dollars: number };
     address: string;
+    btcAddress?: string | null;
 }
 
 export interface SocialAgentStatus {

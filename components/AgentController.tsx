@@ -476,6 +476,18 @@ export const AgentController: React.FC = () => {
                                             )}
                                         </div>
                                     </div>
+                                    {[
+                                        { label: 'STX', addr: socialWallet.address },
+                                        ...(socialWallet.btcAddress ? [{ label: 'BTC', addr: socialWallet.btcAddress }] : []),
+                                    ].map(({ label, addr }) => (
+                                        <div key={label} className="flex items-center gap-2 bg-surface rounded-xl px-3 py-2">
+                                            <span className="text-xs font-mono text-inkLight flex-1 truncate">{addr.slice(0, 10)}…{addr.slice(-6)}</span>
+                                            <span className="text-[10px] font-black text-inkLight uppercase">{label}</span>
+                                            <button onClick={() => copyToClipboard(addr, () => {})} className="text-inkLight hover:text-gold transition-colors" aria-label={`Copy ${label} address`}>
+                                                <Copy className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    ))}
                                     {socialStatus.last_error && (
                                         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
                                             <p className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Last Error</p>
