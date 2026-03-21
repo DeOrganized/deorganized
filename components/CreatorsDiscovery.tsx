@@ -57,6 +57,20 @@ export const CreatorsDiscovery: React.FC<CreatorsDiscoveryProps> = ({ onNavigate
   return (
     <div className="min-h-screen pt-24 pb-20 container max-w-[1280px] mx-auto px-6">
 
+      {/* Communities bridge banner */}
+      <div className="mb-8 flex items-center justify-between bg-surface border border-borderSubtle rounded-2xl px-5 py-3.5">
+        <div className="flex items-center gap-2 text-sm text-inkLight">
+          <Users className="w-4 h-4 text-gold" />
+          <span>Looking for communities? Find groups built around your favourite creators.</span>
+        </div>
+        <button
+          onClick={() => onNavigate?.('communities')}
+          className="text-sm font-bold text-gold hover:text-gold/80 transition-colors whitespace-nowrap ml-4"
+        >
+          Explore Communities →
+        </button>
+      </div>
+
       {/* Hero Call to Action */}
       <section className="mb-16 text-center max-w-4xl mx-auto">
         <motion.div

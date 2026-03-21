@@ -153,7 +153,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
   const navLinks = [
     { label: 'Shows', id: 'shows' },
     { label: 'Creators', id: 'creators' },
-    { label: 'Community', id: 'community' },
+    { label: 'Communities', id: 'communities' },
     { label: 'Calendar', id: 'event-calendar' },
     { label: 'DAPs', id: 'daps' },
     { label: 'Meet the Agents', id: 'agents' },
@@ -223,21 +223,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
 
           {isBackendAuthenticated && backendUser ? (
             <>
-              {/* Dashboard link for creators */}
-              {backendUser.role === 'creator' && (
-                <button
-                  onClick={() => handleNavClick('dashboard')}
-                  className={`relative text-sm font-medium transition-colors ${currentPage === 'dashboard' ? 'text-gold' : 'text-inkLight hover:text-gold'
-                    }`}
-                >
-                  Studio
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-                      {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                    </span>
-                  )}
-                </button>
-              )}
+              {/* Dashboard link for all authenticated users */}
+              <button
+                onClick={() => handleNavClick('dashboard')}
+                className={`relative text-sm font-medium transition-colors ${currentPage === 'dashboard' ? 'text-gold' : 'text-inkLight hover:text-gold'
+                  }`}
+              >
+                {backendUser.role === 'creator' ? 'Studio' : 'Dashboard'}
+                {unreadNotifications > 0 && (
+                  <span className="absolute -top-1 -right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                  </span>
+                )}
+              </button>
 
               {/* Profile button */}
               <button
@@ -303,14 +301,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
 
           {isBackendAuthenticated && backendUser ? (
             <>
-              {backendUser.role === 'creator' && (
-                <button
-                  onClick={() => handleNavClick('dashboard')}
-                  className="text-lg font-medium text-left text-ink hover:text-gold"
-                >
-                  Creator Studio
-                </button>
-              )}
+              <button
+                onClick={() => handleNavClick('dashboard')}
+                className="text-lg font-medium text-left text-ink hover:text-gold"
+              >
+                {backendUser.role === 'creator' ? 'Creator Studio' : 'Dashboard'}
+              </button>
               <button
                 onClick={() => handleNavClick('user-profile')}
                 className="text-lg font-medium text-left text-ink hover:text-gold"

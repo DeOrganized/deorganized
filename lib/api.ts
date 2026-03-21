@@ -458,6 +458,7 @@ export interface Creator {
     role: 'user' | 'creator';
     follower_count: number;
     following_count?: number;
+    community_slug?: string | null;
 }
 
 // Creator Statistics Interface

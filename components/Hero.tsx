@@ -445,10 +445,16 @@ export const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
                 {isBackendAuthenticated ? 'My Dashboard' : 'Connect Wallet'}
               </button>
               <button
-                onClick={() => onNavigate?.('shows')}
+                onClick={() => onNavigate?.('communities')}
                 className="border border-borderSubtle bg-canvas hover:border-gold/50 hover:bg-surface px-8 py-4 rounded-full text-sm font-semibold transition-all text-ink"
               >
-                Watch Shows
+                Explore Communities
+              </button>
+              <button
+                onClick={() => onNavigate?.('shows')}
+                className="text-sm font-medium text-inkLight hover:text-ink transition-colors"
+              >
+                Watch Shows →
               </button>
             </div>
           </motion.div>

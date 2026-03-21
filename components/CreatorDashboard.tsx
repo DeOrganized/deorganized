@@ -22,6 +22,7 @@ import {
    getReceivedGuestRequests,
    acceptGuestRequest,
    declineGuestRequest,
+   getMyCommunities,
    CreateShowPayload,
    Show,
    Event,
@@ -29,6 +30,7 @@ import {
    UserProfile,
    Notification,
    GuestRequest,
+   MembershipWithCommunity,
    Tag
 } from '../lib/api';
 
@@ -99,6 +101,9 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
    // Followers modal
    const [showFollowersModal, setShowFollowersModal] = useState(false);
    const [followersModalTab, setFollowersModalTab] = useState<'followers' | 'following'>('followers');
+
+   // My Communities
+   const [myCommunities, setMyCommunities] = useState<MembershipWithCommunity[]>([]);
 
    const [isUpgrading, setIsUpgrading] = useState(false);
    const [upgradeError, setUpgradeError] = useState<string | null>(null);
@@ -301,6 +306,12 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
       loadNotifications();
    }, [accessToken]);
 
+   // Fetch my communities
+   useEffect(() => {
+      if (!accessToken) return;
+      getMyCommunities(accessToken).then(setMyCommunities).catch(() => {});
+   }, [accessToken]);
+
    // Form handlers
    const handleFormChange = (field: string, value: any) => {
       setFormData(prev => ({ ...prev, [field]: value }));
@@ -471,58 +482,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
       );
    }
 
-   if (backendUser.role !== 'creator') {
-      const handleUpgrade = async () => {
-         if (!accessToken) return;
-         setIsUpgrading(true);
-         setUpgradeError(null);
-         try {
-            const formData = new FormData();
-            formData.append('role', 'creator');
-            await updateUserProfile(backendUser.id, formData, accessToken);
-            await refreshUser();
-         } catch (e: any) {
-            setUpgradeError(e.message || 'Failed to upgrade. Please try again.');
-         } finally {
-            setIsUpgrading(false);
-         }
-      };
 
-      return (
-         <div className="min-h-screen pt-24 pb-20 flex items-center justify-center px-6">
-            <div className="bg-canvas rounded-3xl shadow-soft border border-borderSubtle p-10 max-w-md w-full text-center">
-               <div className="w-14 h-14 rounded-2xl bg-gold/10 flex items-center justify-center mx-auto mb-5">
-                  <Zap className="w-7 h-7 text-gold" />
-               </div>
-               <h2 className="text-2xl font-bold text-ink mb-2">Unlock Creator Tools</h2>
-               <p className="text-inkLight text-sm mb-7">
-                  Upgrade to a free Creator account to access the Content Engine, live scheduling, episode management, and more.
-               </p>
-               <div className="flex items-center justify-center gap-2 bg-gold/10 border border-gold/30 rounded-2xl px-4 py-3 mb-5">
-                  <Zap className="w-4 h-4 text-gold shrink-0" />
-                  <p className="text-sm font-bold text-gold">Upgrade now and receive 1,000 DAP credits to start generating content!</p>
-               </div>
-               {upgradeError && (
-                  <p className="text-sm text-red-500 font-medium mb-4">{upgradeError}</p>
-               )}
-               <button
-                  onClick={handleUpgrade}
-                  disabled={isUpgrading}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-gold-gradient text-white font-bold rounded-2xl shadow-lg shadow-gold/20 hover:shadow-gold/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
-               >
-                  {isUpgrading ? (
-                     <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Upgrading...
-                     </>
-                  ) : (
-                     'Upgrade to Creator — Free'
-                  )}
-               </button>
-            </div>
-         </div>
-      );
-   }
 
    const formatNumber = (num: number): string => {
       if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -666,10 +626,44 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                      >
                         <div className="flex justify-between items-end">
                            <div>
-                              <h1 className="text-4xl font-bold text-ink mb-2">Creator Hub</h1>
+                              <h1 className="text-4xl font-bold text-ink mb-2">
+                                 {backendUser.role === 'creator' ? 'Creator Hub' : 'Dashboard'}
+                              </h1>
                               <p className="text-inkLight font-medium">Manage your content, earnings, and community.</p>
                            </div>
                         </div>
+
+                        {backendUser.role !== 'creator' && (
+                           <div className="flex items-center justify-between gap-4 bg-gold/5 border border-gold/20 rounded-2xl px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                 <Zap className="w-5 h-5 text-gold shrink-0" />
+                                 <div>
+                                    <p className="text-sm font-bold text-ink">Unlock Creator Tools — Free</p>
+                                    <p className="text-xs text-inkLight">Upgrade to schedule shows, host events, and earn with content.</p>
+                                 </div>
+                              </div>
+                              <button
+                                 onClick={async () => {
+                                    if (!accessToken) return;
+                                    setIsUpgrading(true);
+                                    try {
+                                       const fd = new FormData();
+                                       fd.append('role', 'creator');
+                                       await updateUserProfile(backendUser.id, fd, accessToken);
+                                       await refreshUser();
+                                    } catch (e: any) {
+                                       setUpgradeError(e.message || 'Failed to upgrade.');
+                                    } finally {
+                                       setIsUpgrading(false);
+                                    }
+                                 }}
+                                 disabled={isUpgrading}
+                                 className="shrink-0 bg-gold text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-gold/90 transition-colors disabled:opacity-50"
+                              >
+                                 {isUpgrading ? 'Upgrading...' : 'Upgrade Free'}
+                              </button>
+                           </div>
+                        )}
 
          {/* 1. Profile Overview Card */}
          <section className="bg-canvas border border-borderSubtle rounded-3xl p-6 md:p-8 shadow-soft relative overflow-hidden">
@@ -1764,6 +1758,66 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                            <MoreHorizontal className="w-4 h-4" />
                         </button>
                      </div>
+                  ))}
+               </div>
+            )}
+         </section>
+
+         {/* My Communities */}
+         <section className="bg-canvas border border-borderSubtle rounded-3xl p-6 md:p-8 shadow-soft">
+            <div className="flex items-center justify-between mb-6">
+               <div>
+                  <h3 className="text-xl font-bold text-ink">My Communities</h3>
+                  <p className="text-sm text-inkLight mt-0.5">Communities you've joined or founded.</p>
+               </div>
+               <div className="flex items-center gap-2">
+                  <button
+                     onClick={() => onNavigate('communities')}
+                     className="text-sm font-bold text-inkLight hover:text-gold transition-colors"
+                  >
+                     Browse All
+                  </button>
+                  <button
+                     onClick={() => onNavigate('create-community')}
+                     className="flex items-center gap-1.5 bg-gold text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-gold/90 transition-colors"
+                  >
+                     <Plus className="w-4 h-4" />
+                     Create
+                  </button>
+               </div>
+            </div>
+            {myCommunities.length === 0 ? (
+               <div className="text-center py-8">
+                  <Users className="w-10 h-10 text-inkLight/40 mx-auto mb-3" />
+                  <p className="text-inkLight text-sm mb-4">You haven't joined any communities yet.</p>
+                  <button
+                     onClick={() => onNavigate('communities')}
+                     className="text-sm font-bold text-gold hover:text-gold/80 transition-colors"
+                  >
+                     Explore Communities →
+                  </button>
+               </div>
+            ) : (
+               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {myCommunities.map(({ community, role }) => (
+                     <button
+                        key={community.id}
+                        onClick={() => onNavigate('community-page', community.slug)}
+                        className="flex items-center gap-3 p-3 bg-surface rounded-2xl border border-borderSubtle hover:border-gold/40 transition-colors text-left"
+                     >
+                        <div className="w-10 h-10 rounded-xl bg-canvas overflow-hidden shrink-0 flex items-center justify-center border border-borderSubtle">
+                           {community.avatar ? (
+                              <img src={community.avatar} alt={community.name} className="w-full h-full object-cover" />
+                           ) : (
+                              <span className="text-sm font-black text-inkLight">{community.name[0]?.toUpperCase()}</span>
+                           )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                           <p className="text-sm font-bold text-ink truncate">{community.name}</p>
+                           <p className="text-xs text-inkLight capitalize">{role}</p>
+                        </div>
+                        {role === 'founder' && <Crown className="w-3.5 h-3.5 text-gold shrink-0" />}
+                     </button>
                   ))}
                </div>
             )}

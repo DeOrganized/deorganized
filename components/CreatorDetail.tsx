@@ -310,6 +310,17 @@ export const CreatorDetail: React.FC<CreatorDetailProps> = ({ onNavigate, creato
                               </motion.div>
                            )}
                         </div>
+
+                        {/* View Community button — show if creator has a community */}
+                        {creator.community_slug && (
+                           <button
+                              onClick={() => onNavigate('community-page', creator.community_slug!)}
+                              className="px-6 py-3 rounded-full font-bold transition-all bg-gold/10 border border-gold/30 text-gold hover:bg-gold/20 flex items-center gap-2"
+                           >
+                              <Users className="w-4 h-4" />
+                              View Community
+                           </button>
+                        )}
                      </div>
 
                      {/* Bio */}

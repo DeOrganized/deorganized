@@ -22,6 +22,7 @@ import {
    registerDAP,
    getDAPBalance,
    getStacksWalletBalances,
+   getMyCommunities,
    UserProfile,
    Creator,
    Show,
@@ -30,6 +31,7 @@ import {
    DAPUser,
    DAPBalance,
    StacksWalletBalances,
+   MembershipWithCommunity,
 } from '../lib/api';
 
 interface UserDashboardProps {
@@ -76,6 +78,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
    const [depositPending, setDepositPending] = useState(false);
    const [advancedOpen, setAdvancedOpen] = useState(false);
 
+   // My communities
+   const [myCommunities, setMyCommunities] = useState<MembershipWithCommunity[]>([]);
+
    // Load activity feed
    useEffect(() => {
       const loadActivity = async () => {
@@ -113,6 +118,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
 
       loadUserProfile();
    }, [backendUser?.id, accessToken]);
+
+   // Fetch my communities
+   useEffect(() => {
+      if (!accessToken) return;
+      getMyCommunities(accessToken).then(setMyCommunities).catch(() => {});
+   }, [accessToken]);
 
    // Fetch following list
    useEffect(() => {
@@ -259,6 +270,55 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
             >
                <LogOut className="w-4 h-4" /> Sign Out
             </button>
+         </div>
+
+         {/* ── MY COMMUNITIES ──────────────────────────────────────────── */}
+         <div className="bg-canvas border border-borderSubtle rounded-3xl p-6 shadow-soft">
+            <div className="flex items-center justify-between mb-4">
+               <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center">
+                     <Users className="w-4 h-4 text-gold" />
+                  </div>
+                  <h3 className="text-base font-bold text-ink">My Communities</h3>
+               </div>
+               <button
+                  onClick={() => onNavigate('communities')}
+                  className="text-sm font-bold text-inkLight hover:text-gold transition-colors"
+               >
+                  Browse All →
+               </button>
+            </div>
+            {myCommunities.length === 0 ? (
+               <div className="flex flex-col items-center gap-3 py-6 text-center">
+                  <p className="text-sm text-inkLight">You haven't joined any communities yet.</p>
+                  <button
+                     onClick={() => onNavigate('communities')}
+                     className="text-sm font-bold text-gold hover:text-gold/80 transition-colors"
+                  >
+                     Explore Communities →
+                  </button>
+               </div>
+            ) : (
+               <div className="flex flex-wrap gap-3">
+                  {myCommunities.map(({ community, role }) => (
+                     <button
+                        key={community.id}
+                        onClick={() => onNavigate('community-page', community.slug)}
+                        className="flex items-center gap-2.5 px-3 py-2 bg-surface rounded-xl border border-borderSubtle hover:border-gold/40 transition-colors"
+                     >
+                        <div className="w-7 h-7 rounded-lg bg-canvas overflow-hidden shrink-0 flex items-center justify-center border border-borderSubtle">
+                           {community.avatar ? (
+                              <img src={community.avatar} alt={community.name} className="w-full h-full object-cover" />
+                           ) : (
+                              <span className="text-xs font-black text-inkLight">{community.name[0]?.toUpperCase()}</span>
+                           )}
+                        </div>
+                        <span className="text-sm font-bold text-ink">{community.name}</span>
+                        {role === 'founder' && <Crown className="w-3 h-3 text-gold" />}
+                     </button>
+                  ))}
+               </div>
+            )}
          </div>
 
          {/* ── WALLET & CREDITS ────────────────────────────────────────── */}

@@ -328,6 +328,18 @@ export const ProfileSetup: React.FC<ProfileSetupProps> = ({ onNavigate }) => {
                             </>
                         )}
                     </button>
+
+                    {/* Community prompt */}
+                    <p className="text-center text-sm text-inkLight mt-4">
+                        Want to build a community?{' '}
+                        <button
+                            type="button"
+                            onClick={() => onNavigate('communities')}
+                            className="text-gold font-bold hover:text-gold/80 transition-colors"
+                        >
+                            Explore Communities →
+                        </button>
+                    </p>
                 </form>
 
             </div>
