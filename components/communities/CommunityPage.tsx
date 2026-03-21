@@ -374,6 +374,7 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
 
     const [membershipId, setMembershipId] = useState<number | null>(null);
     const [userRole, setUserRole] = useState<MembershipRole | null>(null);
+    const [membershipLoaded, setMembershipLoaded] = useState(false);
     const [isFollowing, setIsFollowing] = useState(false);
     const [followLoading, setFollowLoading] = useState(false);
 
@@ -388,12 +389,14 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
     // Load community on mount
     useEffect(() => {
         setLoading(true);
+        setMembershipLoaded(false);
         getCommunity(slug, accessToken || undefined)
             .then((c) => {
                 setCommunity(c);
                 setMembershipId(c.user_membership?.id ?? null);
                 setUserRole((c.user_membership?.role as MembershipRole) ?? null);
                 setIsFollowing(c.user_is_following);
+                setMembershipLoaded(true);
             })
             .catch(console.error)
             .finally(() => setLoading(false));
@@ -538,6 +541,7 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
                             communitySlug={community.slug}
                             membershipId={membershipId}
                             membershipRole={userRole}
+                            communityLoading={!membershipLoaded}
                             onChanged={handleMembershipChanged}
                         />
                     </div>

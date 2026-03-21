@@ -7,20 +7,22 @@ interface Props {
     communitySlug: string;
     membershipId: number | null;
     membershipRole: MembershipRole | null;
+    communityLoading?: boolean;
     onChanged: (membershipId: number | null, role: MembershipRole | null) => void;
 }
 
-export const JoinButton: React.FC<Props> = ({ communitySlug, membershipId, membershipRole, onChanged }) => {
+export const JoinButton: React.FC<Props> = ({ communitySlug, membershipId, membershipRole, communityLoading, onChanged }) => {
     const { accessToken, isBackendAuthenticated } = useAuth();
     const [loading, setLoading] = useState(false);
 
-    if (!isBackendAuthenticated) return null;
+    if (!isBackendAuthenticated || communityLoading) return null;
 
     const isMember = membershipId !== null;
     const isFounder = membershipRole === 'founder';
+    const isAdmin = membershipRole === 'admin';
 
     const handleClick = async () => {
-        if (!accessToken || isFounder) return;
+        if (!accessToken || isFounder || isAdmin) return;
         setLoading(true);
         try {
             if (isMember) {
@@ -37,7 +39,7 @@ export const JoinButton: React.FC<Props> = ({ communitySlug, membershipId, membe
         }
     };
 
-    if (isFounder) return null;
+    if (isFounder || isAdmin) return null;
 
     return (
         <button
