@@ -8,6 +8,10 @@ import { API_BASE_URL } from '../lib/api';
 import { getValidAccessToken } from '../lib/walletAuth';
 import { trackEvent } from '../lib/engagement';
 import { useToast } from './Toast';
+import {
+    LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+    Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
 
 // ============================================
 // Types
@@ -215,6 +219,39 @@ const createLTPartnerProduct = (partnerId: number, body: object) =>
 const deleteLTPartnerProduct = (partnerId: number, productId: number) =>
     ltFetch(`partners/${partnerId}/products/${productId}/`, { method: 'DELETE' });
 
+async function engagementAdminFetch(path: string): Promise<any> {
+    const token = await getValidAccessToken();
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch(`${API_BASE_URL}/engagement/${path}`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || data?.detail || `Request failed: ${res.status}`);
+    }
+    return res.json();
+}
+
+const fetchUmamiStats = (period: string) => engagementAdminFetch(`admin/umami/stats/?period=${period}`);
+const fetchUmamiPageviews = (period: string, unit = 'day') => engagementAdminFetch(`admin/umami/pageviews/?period=${period}&unit=${unit}`);
+const fetchUmamiMetrics = (period: string, type: string, limit = 20) => engagementAdminFetch(`admin/umami/metrics/?period=${period}&type=${type}&limit=${limit}`);
+const fetchEngagementStats = (period: string) => engagementAdminFetch(`admin/stats/?period=${period}`);
+const fetchEngagementJourney = (userId: string) => engagementAdminFetch(`admin/journey/${userId}/`);
+
+// Merge Umami pageview time-series with Engagement daily time-series into one chart array
+function buildCombinedChartData(pageviewsRes: any, engagementDaily: any[]): any[] {
+    const map: Record<string, any> = {};
+    (pageviewsRes?.pageviews ?? []).forEach((pt: any) => {
+        const key = String(pt.x).slice(0, 10);
+        map[key] = { ...map[key], date: key, pageviews: pt.y ?? 0 };
+    });
+    engagementDaily.forEach((pt: any) => {
+        const key = String(pt.day).slice(0, 10);
+        map[key] = { ...map[key], date: key, events: pt.events ?? 0, users: pt.users ?? 0 };
+    });
+    return Object.values(map).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 // ============================================
 // Component
 // ============================================
@@ -314,6 +351,28 @@ export const AnalyticsEcosystem: React.FC = () => {
     const [ltNewKeyForm, setLtNewKeyForm] = useState({ name: '', scope: 'read', partner_id: '' });
     const [ltKeySaving, setLtKeySaving] = useState(false);
     const [ltKeyDetailModal, setLtKeyDetailModal] = useState<LTKey | null>(null);
+
+    // Overview
+    const [overviewPeriod, setOverviewPeriod] = useState('30d');
+    const [overviewStats, setOverviewStats] = useState<any>(null);
+    const [overviewPageviews, setOverviewPageviews] = useState<any>(null);
+    const [overviewEngagement, setOverviewEngagement] = useState<any>(null);
+    const [overviewLoading, setOverviewLoading] = useState(false);
+
+    // Traffic
+    const [trafficPeriod, setTrafficPeriod] = useState('30d');
+    const [trafficStats, setTrafficStats] = useState<any>(null);
+    const [trafficPageviews, setTrafficPageviews] = useState<any>(null);
+    const [trafficMetrics, setTrafficMetrics] = useState<{ pages: any[]; referrers: any[]; countries: any[]; devices: any[]; browsers: any[] } | null>(null);
+    const [trafficLoading, setTrafficLoading] = useState(false);
+
+    // Engagement analytics
+    const [engPeriod, setEngPeriod] = useState('30d');
+    const [engStats, setEngStats] = useState<any>(null);
+    const [engLoading, setEngLoading] = useState(false);
+    const [engJourneyUser, setEngJourneyUser] = useState('');
+    const [engJourneyData, setEngJourneyData] = useState<any>(null);
+    const [engJourneyLoading, setEngJourneyLoading] = useState(false);
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -436,6 +495,78 @@ export const AnalyticsEcosystem: React.FC = () => {
         } catch { /* non-fatal */ }
     };
 
+    const loadOverview = async (period = overviewPeriod) => {
+        setOverviewLoading(true);
+        try {
+            const [statsRes, pageviewsRes, engRes] = await Promise.all([
+                fetchUmamiStats(period),
+                fetchUmamiPageviews(period),
+                fetchEngagementStats(period),
+            ]);
+            setOverviewStats(statsRes);
+            setOverviewPageviews(pageviewsRes);
+            setOverviewEngagement(engRes);
+        } catch (err: any) {
+            toast.error('Failed to load overview: ' + err.message);
+        } finally {
+            setOverviewLoading(false);
+        }
+    };
+
+    const loadTraffic = async (period = trafficPeriod) => {
+        setTrafficLoading(true);
+        try {
+            const [statsRes, pageviewsRes, pagesRes, referrersRes, countriesRes, devicesRes, browsersRes] = await Promise.all([
+                fetchUmamiStats(period),
+                fetchUmamiPageviews(period),
+                fetchUmamiMetrics(period, 'url'),
+                fetchUmamiMetrics(period, 'referrer'),
+                fetchUmamiMetrics(period, 'country'),
+                fetchUmamiMetrics(period, 'device'),
+                fetchUmamiMetrics(period, 'browser'),
+            ]);
+            setTrafficStats(statsRes);
+            setTrafficPageviews(pageviewsRes);
+            setTrafficMetrics({
+                pages: Array.isArray(pagesRes) ? pagesRes : [],
+                referrers: Array.isArray(referrersRes) ? referrersRes : [],
+                countries: Array.isArray(countriesRes) ? countriesRes : [],
+                devices: Array.isArray(devicesRes) ? devicesRes : [],
+                browsers: Array.isArray(browsersRes) ? browsersRes : [],
+            });
+        } catch (err: any) {
+            toast.error('Failed to load traffic: ' + err.message);
+        } finally {
+            setTrafficLoading(false);
+        }
+    };
+
+    const loadEngagement = async (period = engPeriod) => {
+        setEngLoading(true);
+        try {
+            const data = await fetchEngagementStats(period);
+            setEngStats(data);
+        } catch (err: any) {
+            toast.error('Failed to load engagement: ' + err.message);
+        } finally {
+            setEngLoading(false);
+        }
+    };
+
+    const lookupEngagementJourney = async () => {
+        if (!engJourneyUser.trim()) return;
+        setEngJourneyLoading(true);
+        setEngJourneyData(null);
+        try {
+            const data = await fetchEngagementJourney(engJourneyUser.trim());
+            setEngJourneyData(data);
+        } catch (err: any) {
+            toast.error('Failed to load journey: ' + err.message);
+        } finally {
+            setEngJourneyLoading(false);
+        }
+    };
+
     // ── Effects ───────────────────────────────────────────────────────────────
 
     useEffect(() => {
@@ -444,7 +575,9 @@ export const AnalyticsEcosystem: React.FC = () => {
         if (ltSubView === 'partners') loadLtPartners();
         if (ltSubView === 'campaigns') { loadLtPartners(); loadLtCampaigns(); }
         if (ltSubView === 'keys') { loadLtPartners(); loadLtKeys(); }
-        // overview, traffic, engagement, dap-economy, reports: placeholders — nothing to load
+        if (ltSubView === 'overview') loadOverview();
+        if (ltSubView === 'traffic') loadTraffic();
+        if (ltSubView === 'engagement') loadEngagement();
     }, [ltSubView, isStaff]);
 
     useEffect(() => {
@@ -454,6 +587,18 @@ export const AnalyticsEcosystem: React.FC = () => {
     useEffect(() => {
         if (ltSubView === 'links' && isStaff) loadLtLinks();
     }, [ltLinksPartnerFilter]);
+
+    useEffect(() => {
+        if (ltSubView === 'overview' && isStaff) loadOverview(overviewPeriod);
+    }, [overviewPeriod]);
+
+    useEffect(() => {
+        if (ltSubView === 'traffic' && isStaff) loadTraffic(trafficPeriod);
+    }, [trafficPeriod]);
+
+    useEffect(() => {
+        if (ltSubView === 'engagement' && isStaff) loadEngagement(engPeriod);
+    }, [engPeriod]);
 
     // ── Render ────────────────────────────────────────────────────────────────
 
@@ -719,10 +864,167 @@ export const AnalyticsEcosystem: React.FC = () => {
 
                     {/* Sub-view routing */}
                     {ltSubView === 'overview' && (
-                        <div className="p-8 text-inkLight">Overview — coming soon</div>
+                        <div className="space-y-6">
+                            {/* Period selector */}
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-black text-ink">Overview</h2>
+                                <div className="flex gap-1">
+                                    {(['24h', '7d', '30d', '90d'] as const).map(p => (
+                                        <button key={p} onClick={() => setOverviewPeriod(p)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${overviewPeriod === p ? 'bg-ink text-canvas' : 'bg-surface text-inkLight hover:text-ink border border-borderSubtle'}`}>
+                                            {p}
+                                        </button>
+                                    ))}
+                                    <button onClick={() => loadOverview(overviewPeriod)} className="ml-2 p-1.5 rounded-lg bg-surface border border-borderSubtle text-inkLight hover:text-ink transition-colors">
+                                        <RefreshCw className={`w-3.5 h-3.5 ${overviewLoading ? 'animate-spin' : ''}`} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Umami summary cards */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {[
+                                    { label: 'Active Now', value: overviewStats?.active_visitors ?? '—', sub: 'visitors' },
+                                    { label: 'Unique Visitors', value: overviewStats?.stats?.uniques?.value ?? '—', sub: overviewStats?.stats?.uniques?.change != null ? `${overviewStats.stats.uniques.change >= 0 ? '+' : ''}${overviewStats.stats.uniques.change} vs prev` : '' },
+                                    { label: 'Pageviews', value: overviewStats?.stats?.pageviews?.value ?? '—', sub: overviewStats?.stats?.pageviews?.change != null ? `${overviewStats.stats.pageviews.change >= 0 ? '+' : ''}${overviewStats.stats.pageviews.change} vs prev` : '' },
+                                    { label: 'Sessions', value: overviewStats?.stats?.visits?.value ?? '—', sub: '' },
+                                ].map(({ label, value, sub }) => (
+                                    <div key={label} className="bg-canvas border border-borderSubtle rounded-2xl p-4">
+                                        <div className="text-xs text-inkLight font-bold uppercase tracking-wide mb-1">{label}</div>
+                                        <div className="text-2xl font-black text-ink">{overviewLoading ? '…' : value?.toLocaleString?.() ?? value}</div>
+                                        {sub && <div className="text-xs text-inkLight mt-0.5">{sub}</div>}
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Engagement summary cards */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                {[
+                                    { label: 'Total Events', value: overviewEngagement?.summary?.total_events },
+                                    { label: 'Engaged Users', value: overviewEngagement?.summary?.unique_users },
+                                    { label: 'Weighted Score', value: overviewEngagement?.summary?.weighted_score },
+                                ].map(({ label, value }) => (
+                                    <div key={label} className="bg-canvas border border-borderSubtle rounded-2xl p-4">
+                                        <div className="text-xs text-inkLight font-bold uppercase tracking-wide mb-1">{label}</div>
+                                        <div className="text-2xl font-black text-ink">{overviewLoading ? '…' : (value?.toLocaleString?.() ?? '—')}</div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Combined chart */}
+                            {(() => {
+                                const chartData = buildCombinedChartData(overviewPageviews, overviewEngagement?.daily ?? []);
+                                if (chartData.length === 0) return null;
+                                return (
+                                    <div className="bg-canvas border border-borderSubtle rounded-2xl p-6">
+                                        <h3 className="text-sm font-bold text-inkLight mb-4">Pageviews &amp; Engagement Events</h3>
+                                        <ResponsiveContainer width="100%" height={220}>
+                                            <LineChart data={chartData} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-subtle, #e5e7eb)" />
+                                                <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={d => d.slice(5)} />
+                                                <YAxis tick={{ fontSize: 11 }} />
+                                                <Tooltip />
+                                                <Legend />
+                                                <Line type="monotone" dataKey="pageviews" stroke="#f59e0b" dot={false} strokeWidth={2} name="Pageviews" />
+                                                <Line type="monotone" dataKey="events" stroke="#6366f1" dot={false} strokeWidth={2} name="Events" />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                );
+                            })()}
+                        </div>
                     )}
                     {ltSubView === 'traffic' && (
-                        <div className="p-8 text-inkLight">Traffic — coming soon</div>
+                        <div className="space-y-6">
+                            {/* Period selector */}
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-black text-ink">Traffic</h2>
+                                <div className="flex gap-1">
+                                    {(['24h', '7d', '30d', '90d'] as const).map(p => (
+                                        <button key={p} onClick={() => setTrafficPeriod(p)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${trafficPeriod === p ? 'bg-ink text-canvas' : 'bg-surface text-inkLight hover:text-ink border border-borderSubtle'}`}>
+                                            {p}
+                                        </button>
+                                    ))}
+                                    <button onClick={() => loadTraffic(trafficPeriod)} className="ml-2 p-1.5 rounded-lg bg-surface border border-borderSubtle text-inkLight hover:text-ink transition-colors">
+                                        <RefreshCw className={`w-3.5 h-3.5 ${trafficLoading ? 'animate-spin' : ''}`} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Stats cards */}
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                {[
+                                    { label: 'Pageviews', value: trafficStats?.stats?.pageviews?.value, change: trafficStats?.stats?.pageviews?.change },
+                                    { label: 'Unique Visitors', value: trafficStats?.stats?.uniques?.value, change: trafficStats?.stats?.uniques?.change },
+                                    { label: 'Sessions', value: trafficStats?.stats?.visits?.value, change: trafficStats?.stats?.visits?.change },
+                                    { label: 'Bounce Rate', value: trafficStats?.stats?.bounces?.value != null ? `${Math.round((trafficStats.stats.bounces.value / Math.max(trafficStats.stats.visits?.value ?? 1, 1)) * 100)}%` : '—', change: null },
+                                    { label: 'Avg Visit Time', value: trafficStats?.stats?.totaltime?.value != null ? `${Math.round(trafficStats.stats.totaltime.value / Math.max(trafficStats.stats.visits?.value ?? 1, 1))}s` : '—', change: null },
+                                ].map(({ label, value, change }) => (
+                                    <div key={label} className="bg-canvas border border-borderSubtle rounded-2xl p-4">
+                                        <div className="text-xs text-inkLight font-bold uppercase tracking-wide mb-1">{label}</div>
+                                        <div className="text-xl font-black text-ink">{trafficLoading ? '…' : (value?.toLocaleString?.() ?? value ?? '—')}</div>
+                                        {change != null && <div className={`text-xs mt-0.5 ${change >= 0 ? 'text-green-500' : 'text-red-400'}`}>{change >= 0 ? '+' : ''}{change} vs prev</div>}
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Pageviews chart */}
+                            {(() => {
+                                const pv = trafficPageviews?.pageviews ?? [];
+                                const sess = trafficPageviews?.sessions ?? [];
+                                if (pv.length === 0) return null;
+                                const data = pv.map((pt: any, i: number) => ({
+                                    date: String(pt.x).slice(0, 10),
+                                    pageviews: pt.y ?? 0,
+                                    sessions: sess[i]?.y ?? 0,
+                                }));
+                                return (
+                                    <div className="bg-canvas border border-borderSubtle rounded-2xl p-6">
+                                        <h3 className="text-sm font-bold text-inkLight mb-4">Pageviews &amp; Sessions</h3>
+                                        <ResponsiveContainer width="100%" height={200}>
+                                            <LineChart data={data} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-subtle, #e5e7eb)" />
+                                                <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={d => d.slice(5)} />
+                                                <YAxis tick={{ fontSize: 11 }} />
+                                                <Tooltip />
+                                                <Legend />
+                                                <Line type="monotone" dataKey="pageviews" stroke="#f59e0b" dot={false} strokeWidth={2} name="Pageviews" />
+                                                <Line type="monotone" dataKey="sessions" stroke="#94a3b8" dot={false} strokeWidth={2} name="Sessions" />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Breakdown tables */}
+                            {trafficMetrics && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {[
+                                        { title: 'Top Pages', rows: trafficMetrics.pages },
+                                        { title: 'Referrers', rows: trafficMetrics.referrers },
+                                        { title: 'Countries', rows: trafficMetrics.countries },
+                                        { title: 'Devices', rows: trafficMetrics.devices },
+                                        { title: 'Browsers', rows: trafficMetrics.browsers },
+                                    ].map(({ title, rows }) => (
+                                        <div key={title} className="bg-canvas border border-borderSubtle rounded-2xl overflow-hidden">
+                                            <div className="px-4 py-3 border-b border-borderSubtle">
+                                                <h3 className="text-sm font-bold text-ink">{title}</h3>
+                                            </div>
+                                            <div className="divide-y divide-borderSubtle max-h-48 overflow-y-auto">
+                                                {rows.slice(0, 10).map((row: any, i: number) => (
+                                                    <div key={i} className="flex items-center justify-between px-4 py-2 text-sm">
+                                                        <span className="text-ink truncate max-w-[70%]">{row.x || '(direct)'}</span>
+                                                        <span className="text-inkLight font-bold">{row.y?.toLocaleString()}</span>
+                                                    </div>
+                                                ))}
+                                                {rows.length === 0 && <div className="px-4 py-3 text-inkLight text-xs">No data</div>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     )}
                     {ltSubView === 'links' && (
                         <div className="space-y-5">
@@ -1304,7 +1606,162 @@ export const AnalyticsEcosystem: React.FC = () => {
                         </div>
                     )}
                     {ltSubView === 'engagement' && (
-                        <div className="p-8 text-inkLight">Engagement — coming soon</div>
+                        <div className="space-y-6">
+                            {/* Period selector */}
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-black text-ink">Engagement</h2>
+                                <div className="flex gap-1">
+                                    {(['24h', '7d', '30d', '90d'] as const).map(p => (
+                                        <button key={p} onClick={() => setEngPeriod(p)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${engPeriod === p ? 'bg-ink text-canvas' : 'bg-surface text-inkLight hover:text-ink border border-borderSubtle'}`}>
+                                            {p}
+                                        </button>
+                                    ))}
+                                    <button onClick={() => loadEngagement(engPeriod)} className="ml-2 p-1.5 rounded-lg bg-surface border border-borderSubtle text-inkLight hover:text-ink transition-colors">
+                                        <RefreshCw className={`w-3.5 h-3.5 ${engLoading ? 'animate-spin' : ''}`} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Summary cards */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                {[
+                                    { label: 'Total Events', value: engStats?.summary?.total_events },
+                                    { label: 'Unique Users', value: engStats?.summary?.unique_users },
+                                    { label: 'Weighted Score', value: engStats?.summary?.weighted_score },
+                                ].map(({ label, value }) => (
+                                    <div key={label} className="bg-canvas border border-borderSubtle rounded-2xl p-4">
+                                        <div className="text-xs text-inkLight font-bold uppercase tracking-wide mb-1">{label}</div>
+                                        <div className="text-2xl font-black text-ink">{engLoading ? '…' : (value?.toLocaleString?.() ?? '—')}</div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Top actions BarChart */}
+                            {engStats?.by_action && engStats.by_action.length > 0 && (
+                                <div className="bg-canvas border border-borderSubtle rounded-2xl p-6">
+                                    <h3 className="text-sm font-bold text-inkLight mb-4">Top Action Types</h3>
+                                    <ResponsiveContainer width="100%" height={220}>
+                                        <BarChart data={engStats.by_action.slice(0, 12)} margin={{ top: 5, right: 16, left: 0, bottom: 40 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-subtle, #e5e7eb)" />
+                                            <XAxis dataKey="action" tick={{ fontSize: 10 }} angle={-35} textAnchor="end" interval={0} />
+                                            <YAxis tick={{ fontSize: 11 }} />
+                                            <Tooltip />
+                                            <Bar dataKey="events" fill="#f59e0b" name="Events" radius={[4, 4, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+
+                            {/* Daily events chart */}
+                            {engStats?.daily && engStats.daily.length > 0 && (
+                                <div className="bg-canvas border border-borderSubtle rounded-2xl p-6">
+                                    <h3 className="text-sm font-bold text-inkLight mb-4">Daily Events &amp; Unique Users</h3>
+                                    <ResponsiveContainer width="100%" height={200}>
+                                        <LineChart data={engStats.daily} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-subtle, #e5e7eb)" />
+                                            <XAxis dataKey="day" tick={{ fontSize: 11 }} tickFormatter={d => String(d).slice(5, 10)} />
+                                            <YAxis tick={{ fontSize: 11 }} />
+                                            <Tooltip />
+                                            <Legend />
+                                            <Line type="monotone" dataKey="events" stroke="#f59e0b" dot={false} strokeWidth={2} name="Events" />
+                                            <Line type="monotone" dataKey="users" stroke="#6366f1" dot={false} strokeWidth={2} name="Users" />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+
+                            {/* Partner engagement table */}
+                            {engStats?.by_partner && engStats.by_partner.length > 0 && (
+                                <div className="bg-canvas border border-borderSubtle rounded-2xl overflow-hidden">
+                                    <div className="px-4 py-3 border-b border-borderSubtle">
+                                        <h3 className="text-sm font-bold text-ink">Partner Engagement</h3>
+                                    </div>
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-surface">
+                                            <tr>
+                                                <th className="px-4 py-2 text-left text-xs text-inkLight font-bold">Partner</th>
+                                                <th className="px-4 py-2 text-right text-xs text-inkLight font-bold">Events</th>
+                                                <th className="px-4 py-2 text-right text-xs text-inkLight font-bold">Users</th>
+                                                <th className="px-4 py-2 text-right text-xs text-inkLight font-bold">Score</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-borderSubtle">
+                                            {engStats.by_partner.map((row: any) => (
+                                                <tr key={row.partner_slug} className="hover:bg-surface/50 transition-colors">
+                                                    <td className="px-4 py-2 font-medium text-ink">{row.partner_slug}</td>
+                                                    <td className="px-4 py-2 text-right text-inkLight">{row.events?.toLocaleString()}</td>
+                                                    <td className="px-4 py-2 text-right text-inkLight">{row.unique_users?.toLocaleString()}</td>
+                                                    <td className="px-4 py-2 text-right text-inkLight">{row.weighted?.toLocaleString()}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+
+                            {/* Events by surface table */}
+                            {engStats?.by_surface && engStats.by_surface.length > 0 && (
+                                <div className="bg-canvas border border-borderSubtle rounded-2xl overflow-hidden">
+                                    <div className="px-4 py-3 border-b border-borderSubtle">
+                                        <h3 className="text-sm font-bold text-ink">Events by Surface</h3>
+                                    </div>
+                                    <div className="divide-y divide-borderSubtle">
+                                        {engStats.by_surface.map((row: any) => (
+                                            <div key={row.surface} className="flex items-center justify-between px-4 py-2 text-sm">
+                                                <span className="text-ink font-mono text-xs">{row.surface}</span>
+                                                <span className="text-inkLight font-bold">{row.events?.toLocaleString()}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* User Journey lookup */}
+                            <div className="bg-canvas border border-borderSubtle rounded-2xl p-6 space-y-4">
+                                <h3 className="text-sm font-bold text-ink">User Journey Lookup</h3>
+                                <div className="flex gap-3">
+                                    <input
+                                        value={engJourneyUser}
+                                        onChange={e => setEngJourneyUser(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && lookupEngagementJourney()}
+                                        placeholder="User ID"
+                                        className="flex-1 bg-surface border border-borderSubtle rounded-xl px-4 py-2 text-sm text-ink placeholder-inkLight focus:outline-none focus:border-gold"
+                                    />
+                                    <button onClick={lookupEngagementJourney} disabled={engJourneyLoading || !engJourneyUser.trim()}
+                                        className="px-4 py-2 bg-gold text-canvas text-sm font-black rounded-xl hover:bg-gold/90 transition-colors disabled:opacity-50">
+                                        {engJourneyLoading ? 'Loading…' : 'Look up'}
+                                    </button>
+                                </div>
+                                {engJourneyData && (
+                                    <div className="space-y-3">
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                            {[
+                                                { label: 'Total Events', value: engJourneyData.score?.total_events },
+                                                { label: 'Weighted Score', value: engJourneyData.score?.weighted_score },
+                                                { label: 'Partners', value: engJourneyData.score?.partners },
+                                                { label: 'Active Days', value: engJourneyData.score?.active_days },
+                                            ].map(({ label, value }) => (
+                                                <div key={label} className="bg-surface rounded-xl p-3 text-center">
+                                                    <div className="text-xs text-inkLight font-bold">{label}</div>
+                                                    <div className="text-lg font-black text-ink">{value?.toLocaleString() ?? '—'}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="max-h-64 overflow-y-auto divide-y divide-borderSubtle border border-borderSubtle rounded-xl">
+                                            {engJourneyData.events?.map((ev: any, i: number) => (
+                                                <div key={i} className="px-4 py-2 text-xs flex items-start gap-3">
+                                                    <span className="text-inkLight whitespace-nowrap">{new Date(ev.created_at).toLocaleDateString()}</span>
+                                                    <span className="text-gold font-mono font-bold">{ev.action}</span>
+                                                    {ev.partner_slug && <span className="text-inkLight">{ev.partner_slug}</span>}
+                                                    {ev.surface && <span className="text-inkLight">{ev.surface}</span>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     )}
                     {ltSubView === 'dap-economy' && (
                         <div className="p-8 text-inkLight">DAP Economy — coming soon</div>
