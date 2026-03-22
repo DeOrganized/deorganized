@@ -135,11 +135,10 @@ interface LTLink {
     surface: string;
     is_active: boolean;
     campaign: string | null;
-    campaign_id: number | null;
-    campaign_name: string | null;
     source_ref: string | null;
     label: string | null;
     click_count: number;
+    campaigns: { id: number; name: string }[];
     created_at: string;
 }
 
@@ -155,11 +154,12 @@ interface LTKey {
 }
 
 interface LTGroupedRow {
-    shortcode: string;
-    partner_name: string;
-    surface: string;
+    group_key: string;
+    group_label: string;
+    partner_name?: string;
+    partner_slug?: string;
+    surface?: string;
     total_clicks: number;
-    unique_ips: number;
 }
 
 interface LTLinkStats {
@@ -408,7 +408,13 @@ const fetchLTCampaigns = (params: Record<string, string> = {}) => {
 };
 const createLTCampaign = (body: object) => ltFetch('campaigns/', { method: 'POST', body: JSON.stringify(body) });
 const updateLTCampaign = (id: number, body: object) => ltFetch(`campaigns/${id}/`, { method: 'PUT', body: JSON.stringify(body) });
+const deleteLTCampaign = (id: number) => ltFetch(`campaigns/${id}/`, { method: 'DELETE' });
 const fetchLTCampaignLinks = (id: number) => ltFetch(`campaigns/${id}/links/`);
+const attachLTCampaignLinks = (campaignId: number, linkIds: number[]) =>
+    ltFetch(`campaigns/${campaignId}/links/`, { method: 'POST', body: JSON.stringify({ link_ids: linkIds }) });
+const detachLTCampaignLink = (campaignId: number, linkId: number) =>
+    ltFetch(`campaigns/${campaignId}/links/${linkId}/`, { method: 'DELETE' });
+const fetchLTCampaignAnalytics = (campaignId: number) => ltFetch(`campaigns/${campaignId}/analytics/`);
 
 const fetchLTPartnerContacts = (partnerId: number) => ltFetch(`partners/${partnerId}/contacts/`);
 const createLTPartnerContact = (partnerId: number, body: object) =>
@@ -600,9 +606,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     const [updatingTierFor, setUpdatingTierFor] = useState<string | null>(null);
 
     // Link Tracker tab state
-    const [ltSubView, setLtSubView] = useState<'dashboard' | 'partners' | 'links' | 'keys'>('dashboard');
+    const [ltSubView, setLtSubView] = useState<'dashboard' | 'partners' | 'links' | 'campaigns' | 'keys'>('dashboard');
     // Dashboard
     const [ltDashRows, setLtDashRows] = useState<LTGroupedRow[]>([]);
+    const [ltDashByPartner, setLtDashByPartner] = useState<LTGroupedRow[]>([]);
+    const [ltDashBySurface, setLtDashBySurface] = useState<LTGroupedRow[]>([]);
+    const [ltDashSummary, setLtDashSummary] = useState<{ total_clicks: number; unique_links: number; unique_visitors: number } | null>(null);
     const [ltDashLoading, setLtDashLoading] = useState(false);
     const [ltDashDays, setLtDashDays] = useState<'7' | '30' | '90'>('30');
     const [ltDashTotal, setLtDashTotal] = useState(0);
@@ -635,11 +644,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     const [ltAddingProduct, setLtAddingProduct] = useState(false);
     const [ltProductSaving, setLtProductSaving] = useState(false);
     const [ltNewProductForm, setLtNewProductForm] = useState({ name: '', description: '', url: '' });
-    // Campaigns
+    // Campaigns (in partner detail)
     const [ltAddingCampaign, setLtAddingCampaign] = useState(false);
     const [ltCampaignSaving, setLtCampaignSaving] = useState(false);
     const [ltNewCampaignForm, setLtNewCampaignForm] = useState({ name: '', description: '', start_date: '', end_date: '' });
     const [ltCampaignLinksModal, setLtCampaignLinksModal] = useState<{ campaign: LTCampaign; links: LTLink[] } | null>(null);
+    // Campaigns tab (top-level)
+    const [ltCampaigns, setLtCampaigns] = useState<LTCampaign[]>([]);
+    const [ltCampaignsLoading, setLtCampaignsLoading] = useState(false);
+    const [ltCampaignPartnerFilter, setLtCampaignPartnerFilter] = useState('');
+    const [ltCampaignStatusFilter, setLtCampaignStatusFilter] = useState('all');
+    const [ltAddingCampaignTop, setLtAddingCampaignTop] = useState(false);
+    const [ltNewCampaignTopForm, setLtNewCampaignTopForm] = useState({ partner_id: '', name: '', description: '', start_date: '', end_date: '' });
+    const [ltCampaignTopSaving, setLtCampaignTopSaving] = useState(false);
+    // Campaign detail (inline)
+    const [ltDetailCampaign, setLtDetailCampaign] = useState<any | null>(null);
+    const [ltDetailCampaignLoading, setLtDetailCampaignLoading] = useState(false);
+    // Attach link modal
+    const [ltAttachLinkModal, setLtAttachLinkModal] = useState<LTCampaign | null>(null);
+    const [ltAttachLinkSelected, setLtAttachLinkSelected] = useState<number[]>([]);
+    const [ltAttachLinkSaving, setLtAttachLinkSaving] = useState(false);
     // Links list
     const [ltLinks, setLtLinks] = useState<LTLink[]>([]);
     const [ltLinksLoading, setLtLinksLoading] = useState(false);
@@ -651,7 +675,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     const [ltNewLinkResult, setLtNewLinkResult] = useState<{ tracked_url: string; shortcode: string } | null>(null);
     const [ltNewLinkForm, setLtNewLinkForm] = useState({
         partner_id: '', destination_url: '', surface: 'elio-article',
-        campaign_id: '', campaign: '', source_ref: '', label: '', shortcode: '',
+        campaign: '', source_ref: '', label: '', shortcode: '',
     });
     const [ltLinkSaving, setLtLinkSaving] = useState(false);
     // Keys
@@ -695,6 +719,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
         if (ltSubView === 'dashboard') loadLtDashboard();
         if (ltSubView === 'partners') loadLtPartners();
         if (ltSubView === 'links') { loadLtPartners(); loadLtLinks(); }
+        if (ltSubView === 'campaigns') { loadLtPartners(); loadLtCampaigns(); }
         if (ltSubView === 'keys') { loadLtPartners(); loadLtKeys(); }
     }, [activeTab, ltSubView, isStaff]);
 
@@ -781,10 +806,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     const loadLtDashboard = async () => {
         setLtDashLoading(true);
         try {
-            const data = await fetchLTAnalytics({ group_by: 'shortcode', from: daysAgoISO(parseInt(ltDashDays)) });
-            const rows: LTGroupedRow[] = Array.isArray(data) ? data : (data.rows ?? data.results ?? []);
-            setLtDashRows(rows);
-            setLtDashTotal(rows.reduce((s: number, r: LTGroupedRow) => s + r.total_clicks, 0));
+            const from = daysAgoISO(parseInt(ltDashDays));
+            const [summary, byPartner, bySurface, topLinks] = await Promise.all([
+                fetchLTAnalytics({ from }),
+                fetchLTAnalytics({ group_by: 'partner', from }),
+                fetchLTAnalytics({ group_by: 'surface', from }),
+                fetchLTAnalytics({ group_by: 'link', from }),
+            ]);
+            setLtDashSummary(summary);
+            setLtDashTotal(parseInt(summary?.total_clicks) || 0);
+            setLtDashByPartner(Array.isArray(byPartner) ? byPartner : []);
+            setLtDashBySurface(Array.isArray(bySurface) ? bySurface : []);
+            setLtDashRows(Array.isArray(topLinks) ? topLinks.slice(0, 25) : []);
         } catch (err: any) {
             toast.error('Failed to load analytics: ' + err.message);
         } finally {
@@ -827,6 +860,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
             toast.error('Failed to load keys: ' + err.message);
         } finally {
             setLtKeysLoading(false);
+        }
+    };
+
+    const loadLtCampaigns = async () => {
+        setLtCampaignsLoading(true);
+        try {
+            const params: Record<string, string> = {};
+            if (ltCampaignPartnerFilter) params.partner_id = ltCampaignPartnerFilter;
+            const data = await fetchLTCampaigns(params);
+            setLtCampaigns(Array.isArray(data) ? data : []);
+        } catch (err: any) {
+            toast.error('Failed to load campaigns: ' + err.message);
+        } finally {
+            setLtCampaignsLoading(false);
+        }
+    };
+
+    const openLtCampaignDetail = async (campaign: LTCampaign) => {
+        setLtDetailCampaign(campaign);
+        setLtDetailCampaignLoading(true);
+        try {
+            const full = await ltFetch(`campaigns/${campaign.id}/`);
+            setLtDetailCampaign(full);
+        } catch (err: any) {
+            toast.error('Failed to load campaign: ' + err.message);
+        } finally {
+            setLtDetailCampaignLoading(false);
         }
     };
 
@@ -1590,13 +1650,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                             <div className="bg-canvas border border-borderSubtle rounded-2xl overflow-hidden">
                                                 {ltDetailLinks.length === 0 ? <p className="text-center text-inkLight text-sm py-10">No links for this partner.</p> : (
                                                     <table className="w-full text-sm">
-                                                        <thead><tr className="text-xs text-inkLight font-black uppercase tracking-widest border-b border-borderSubtle"><th className="text-left px-5 py-3">Shortcode</th><th className="text-left px-5 py-3">Surface</th><th className="text-left px-5 py-3">Campaign</th><th className="text-right px-5 py-3">Clicks</th><th className="text-left px-5 py-3">Status</th></tr></thead>
+                                                        <thead><tr className="text-xs text-inkLight font-black uppercase tracking-widest border-b border-borderSubtle"><th className="text-left px-5 py-3">Shortcode</th><th className="text-left px-5 py-3">Surface</th><th className="text-left px-5 py-3">Campaigns</th><th className="text-right px-5 py-3">Clicks</th><th className="text-left px-5 py-3">Status</th></tr></thead>
                                                         <tbody className="divide-y divide-borderSubtle/50">
                                                             {ltDetailLinks.map(link => (
                                                                 <tr key={link.id} className="hover:bg-surface/50 cursor-pointer" onClick={async () => { setLtLinkDetailId(link.id); setLtLinkDetailLoading(true); try { const d = await fetchLTLinkDetail(link.id); setLtLinkDetailModal(d); } catch (e: any) { toast.error(e.message); } finally { setLtLinkDetailLoading(false); } }}>
                                                                     <td className="px-5 py-3 font-mono text-xs text-gold">{link.shortcode}</td>
                                                                     <td className="px-5 py-3 text-inkLight">{link.surface}</td>
-                                                                    <td className="px-5 py-3 text-inkLight text-xs">{link.campaign_name ?? link.campaign ?? '—'}</td>
+                                                                    <td className="px-5 py-3 text-inkLight text-xs">{link.campaigns?.map(c => c.name).join(', ') || link.campaign || '—'}</td>
                                                                     <td className="px-5 py-3 text-right font-bold">{link.click_count?.toLocaleString() ?? '—'}</td>
                                                                     <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${link.is_active ? 'bg-green-100 text-green-700' : 'bg-surface text-inkLight'}`}>{link.is_active ? 'Active' : 'Inactive'}</span></td>
                                                                 </tr>
@@ -1611,14 +1671,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                     <>
                                         {/* Sub-nav */}
                                         <div className="flex gap-2">
-                                            {(['dashboard', 'partners', 'links', 'keys'] as const).map(v => (
-                                                <button key={v} onClick={() => setLtSubView(v)} className={`px-4 py-2 rounded-xl text-sm font-bold capitalize transition-all ${ltSubView === v ? 'bg-ink text-canvas' : 'bg-surface text-inkLight hover:text-ink border border-borderSubtle'}`}>{v}</button>
+                                            {(['dashboard', 'partners', 'links', 'campaigns', 'keys'] as const).map(v => (
+                                                <button key={v} onClick={() => { setLtDetailCampaign(null); setLtSubView(v); }} className={`px-4 py-2 rounded-xl text-sm font-bold capitalize transition-all ${ltSubView === v ? 'bg-ink text-canvas' : 'bg-surface text-inkLight hover:text-ink border border-borderSubtle'}`}>{v}</button>
                                             ))}
                                         </div>
 
                                         {/* ── Dashboard ── */}
                                         {ltSubView === 'dashboard' && (
-                                            <div className="space-y-4">
+                                            <div className="space-y-5">
+                                                {/* Controls */}
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex gap-2">
                                                         {(['7', '30', '90'] as const).map(d => (
@@ -1629,32 +1690,80 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                                         <ExternalLink className="w-3.5 h-3.5" />Export CSV
                                                     </a>
                                                 </div>
-                                                <div className="bg-canvas border border-borderSubtle rounded-2xl p-4">
-                                                    <div className="flex items-center justify-between mb-4">
-                                                        <p className="text-xs font-black text-inkLight uppercase tracking-widest">Click Summary</p>
-                                                        <span className="text-xs font-bold text-inkLight">Total: {ltDashTotal.toLocaleString()}</span>
-                                                    </div>
-                                                    {ltDashLoading ? <div className="flex items-center gap-2 py-8 justify-center text-inkLight"><RefreshCw className="w-4 h-4 animate-spin" /></div>
-                                                    : ltDashRows.length === 0 ? <p className="text-center text-inkLight text-sm py-8">No click data yet.</p>
-                                                    : (
-                                                        <div className="overflow-x-auto">
-                                                            <table className="w-full text-sm">
-                                                                <thead><tr className="text-xs text-inkLight font-black uppercase tracking-widest"><th className="text-left pb-3">Shortcode</th><th className="text-left pb-3">Partner</th><th className="text-left pb-3">Surface</th><th className="text-right pb-3">Clicks</th><th className="text-right pb-3">Unique</th></tr></thead>
-                                                                <tbody className="divide-y divide-borderSubtle/50">
-                                                                    {ltDashRows.map(row => (
-                                                                        <tr key={row.shortcode} className="hover:bg-surface/50 transition-colors">
-                                                                            <td className="py-2.5 font-mono text-xs text-gold">{row.shortcode}</td>
-                                                                            <td className="py-2.5 text-ink">{row.partner_name}</td>
-                                                                            <td className="py-2.5 text-inkLight">{row.surface}</td>
-                                                                            <td className="py-2.5 text-right font-bold text-ink">{row.total_clicks.toLocaleString()}</td>
-                                                                            <td className="py-2.5 text-right text-inkLight">{row.unique_ips?.toLocaleString() ?? '—'}</td>
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
+
+                                                {ltDashLoading ? (
+                                                    <div className="flex items-center gap-2 py-16 justify-center text-inkLight"><RefreshCw className="w-5 h-5 animate-spin" /></div>
+                                                ) : (
+                                                    <>
+                                                        {/* Summary cards */}
+                                                        <div className="grid grid-cols-3 gap-4">
+                                                            <div className="bg-canvas border border-borderSubtle rounded-2xl p-5 text-center">
+                                                                <p className="text-3xl font-black text-ink">{ltDashSummary?.total_clicks?.toLocaleString() ?? '0'}</p>
+                                                                <p className="text-xs text-inkLight font-bold mt-1 uppercase tracking-widest">Total Clicks</p>
+                                                            </div>
+                                                            <div className="bg-canvas border border-borderSubtle rounded-2xl p-5 text-center">
+                                                                <p className="text-3xl font-black text-ink">{ltDashSummary?.unique_visitors?.toLocaleString() ?? '0'}</p>
+                                                                <p className="text-xs text-inkLight font-bold mt-1 uppercase tracking-widest">Unique Visitors</p>
+                                                            </div>
+                                                            <div className="bg-canvas border border-borderSubtle rounded-2xl p-5 text-center">
+                                                                <p className="text-3xl font-black text-ink">{ltDashSummary?.unique_links?.toLocaleString() ?? '0'}</p>
+                                                                <p className="text-xs text-inkLight font-bold mt-1 uppercase tracking-widest">Active Links</p>
+                                                            </div>
                                                         </div>
-                                                    )}
-                                                </div>
+
+                                                        {/* By partner + by surface */}
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div className="bg-canvas border border-borderSubtle rounded-2xl p-5">
+                                                                <p className="text-xs font-black text-inkLight uppercase tracking-widest mb-4">By Partner</p>
+                                                                {ltDashByPartner.length === 0 ? <p className="text-inkLight text-sm text-center py-4">No data</p> : (
+                                                                    <div className="space-y-2">
+                                                                        {ltDashByPartner.slice(0, 8).map(r => (
+                                                                            <div key={r.group_key} className="flex items-center justify-between text-sm">
+                                                                                <span className="text-ink font-bold truncate">{r.group_label}</span>
+                                                                                <span className="text-inkLight ml-2 shrink-0">{r.total_clicks.toLocaleString()}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="bg-canvas border border-borderSubtle rounded-2xl p-5">
+                                                                <p className="text-xs font-black text-inkLight uppercase tracking-widest mb-4">By Surface</p>
+                                                                {ltDashBySurface.length === 0 ? <p className="text-inkLight text-sm text-center py-4">No data</p> : (
+                                                                    <div className="space-y-2">
+                                                                        {ltDashBySurface.slice(0, 8).map(r => (
+                                                                            <div key={r.group_key} className="flex items-center justify-between text-sm">
+                                                                                <span className="text-ink font-bold">{r.group_label}</span>
+                                                                                <span className="text-inkLight ml-2">{r.total_clicks.toLocaleString()}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Top links */}
+                                                        <div className="bg-canvas border border-borderSubtle rounded-2xl p-5">
+                                                            <p className="text-xs font-black text-inkLight uppercase tracking-widest mb-4">Top Links</p>
+                                                            {ltDashRows.length === 0 ? <p className="text-center text-inkLight text-sm py-4">No click data yet.</p> : (
+                                                                <div className="overflow-x-auto">
+                                                                    <table className="w-full text-sm">
+                                                                        <thead><tr className="text-xs text-inkLight font-black uppercase tracking-widest border-b border-borderSubtle"><th className="text-left pb-3">Shortcode</th><th className="text-left pb-3">Partner</th><th className="text-left pb-3">Surface</th><th className="text-right pb-3">Clicks</th></tr></thead>
+                                                                        <tbody className="divide-y divide-borderSubtle/50">
+                                                                            {ltDashRows.map(row => (
+                                                                                <tr key={row.group_key} className="hover:bg-surface/50 transition-colors">
+                                                                                    <td className="py-2.5 font-mono text-xs text-gold">{row.group_key}</td>
+                                                                                    <td className="py-2.5 text-ink">{row.partner_name}</td>
+                                                                                    <td className="py-2.5 text-inkLight">{row.surface}</td>
+                                                                                    <td className="py-2.5 text-right font-bold text-ink">{row.total_clicks.toLocaleString()}</td>
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </>
+                                                )}
                                             </div>
                                         )}
 
@@ -1768,6 +1877,226 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                             </div>
                                         )}
 
+                                        {/* ── Campaigns ── */}
+                                        {ltSubView === 'campaigns' && (
+                                            ltDetailCampaign ? (
+                                                /* Campaign detail view */
+                                                <div className="space-y-5">
+                                                    {/* Header */}
+                                                    <div className="flex items-center gap-3">
+                                                        <button onClick={() => setLtDetailCampaign(null)} className="p-2 hover:bg-surface rounded-xl text-inkLight hover:text-ink transition-colors">
+                                                            <ChevronLeft className="w-5 h-5" />
+                                                        </button>
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <h2 className="text-xl font-black text-ink">{ltDetailCampaign.name}</h2>
+                                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${ltDetailCampaign.is_active ? 'bg-green-100 text-green-700' : 'bg-surface text-inkLight'}`}>{ltDetailCampaign.is_active ? 'Active' : 'Ended'}</span>
+                                                            </div>
+                                                            <p className="text-xs text-inkLight mt-0.5">{ltDetailCampaign.partner_name} {ltDetailCampaign.start_date || ltDetailCampaign.end_date ? `· ${[ltDetailCampaign.start_date, ltDetailCampaign.end_date].filter(Boolean).join(' → ')}` : ''}</p>
+                                                        </div>
+                                                        <button onClick={async () => {
+                                                            if (!window.confirm('Deactivate this campaign?')) return;
+                                                            try {
+                                                                await updateLTCampaign(ltDetailCampaign.id, { is_active: false });
+                                                                setLtDetailCampaign((prev: any) => ({ ...prev, is_active: false }));
+                                                                setLtCampaigns(prev => prev.map(c => c.id === ltDetailCampaign.id ? { ...c, is_active: false } : c));
+                                                                toast.success('Campaign deactivated');
+                                                            } catch (e: any) { toast.error(e.message); }
+                                                        }} className="px-3 py-1.5 text-xs font-bold text-red-500 border border-red-500/30 rounded-xl hover:bg-red-50 transition-colors">Deactivate</button>
+                                                    </div>
+
+                                                    {ltDetailCampaign.description && (
+                                                        <p className="text-sm text-inkLight">{ltDetailCampaign.description}</p>
+                                                    )}
+
+                                                    {ltDetailCampaignLoading ? (
+                                                        <div className="flex items-center gap-2 py-8 justify-center text-inkLight"><RefreshCw className="w-4 h-4 animate-spin" /></div>
+                                                    ) : (
+                                                        <>
+                                                            {/* Stats */}
+                                                            <div className="grid grid-cols-3 gap-3">
+                                                                <div className="bg-canvas border border-borderSubtle rounded-2xl p-4 text-center">
+                                                                    <p className="text-2xl font-black text-ink">{ltDetailCampaign.total_clicks?.toLocaleString() ?? 0}</p>
+                                                                    <p className="text-xs text-inkLight font-bold mt-1 uppercase tracking-widest">Total Clicks</p>
+                                                                </div>
+                                                                <div className="bg-canvas border border-borderSubtle rounded-2xl p-4 text-center">
+                                                                    <p className="text-2xl font-black text-ink">{ltDetailCampaign.unique_ips?.toLocaleString() ?? 0}</p>
+                                                                    <p className="text-xs text-inkLight font-bold mt-1 uppercase tracking-widest">Unique IPs</p>
+                                                                </div>
+                                                                <div className="bg-canvas border border-borderSubtle rounded-2xl p-4 text-center">
+                                                                    <p className="text-2xl font-black text-ink">{ltDetailCampaign.link_count?.toLocaleString() ?? 0}</p>
+                                                                    <p className="text-xs text-inkLight font-bold mt-1 uppercase tracking-widest">Links</p>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Clicks by surface */}
+                                                            {ltDetailCampaign.clicks_by_surface?.length > 0 && (
+                                                                <div className="bg-canvas border border-borderSubtle rounded-2xl p-5">
+                                                                    <p className="text-xs font-black text-inkLight uppercase tracking-widest mb-3">By Surface</p>
+                                                                    <div className="space-y-1.5">
+                                                                        {ltDetailCampaign.clicks_by_surface.map((s: any) => (
+                                                                            <div key={s.surface} className="flex items-center justify-between text-sm">
+                                                                                <span className="text-ink font-bold">{s.surface}</span>
+                                                                                <span className="text-inkLight">{parseInt(s.clicks).toLocaleString()}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Clicks by day */}
+                                                            {ltDetailCampaign.clicks_by_day?.length > 0 && (
+                                                                <div className="bg-canvas border border-borderSubtle rounded-2xl p-5">
+                                                                    <p className="text-xs font-black text-inkLight uppercase tracking-widest mb-3">Clicks by Day</p>
+                                                                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                                                                        {ltDetailCampaign.clicks_by_day.map((d: any) => (
+                                                                            <div key={d.date} className="flex items-center justify-between text-xs">
+                                                                                <span className="text-inkLight">{d.date}</span>
+                                                                                <span className="font-bold text-ink">{parseInt(d.clicks).toLocaleString()}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Links section */}
+                                                            <div>
+                                                                <div className="flex items-center justify-between mb-3">
+                                                                    <p className="text-xs font-black text-inkLight uppercase tracking-widest">Attached Links</p>
+                                                                    <button onClick={() => { setLtAttachLinkModal(ltDetailCampaign); setLtAttachLinkSelected([]); }} className="px-3 py-1.5 bg-gold text-canvas text-xs font-black rounded-xl hover:bg-gold/90 transition-colors">+ Attach Link</button>
+                                                                </div>
+                                                                <div className="bg-canvas border border-borderSubtle rounded-2xl overflow-hidden">
+                                                                    {!ltDetailCampaign.links?.length ? (
+                                                                        <p className="text-center text-inkLight text-sm py-8">No links attached yet.</p>
+                                                                    ) : (
+                                                                        <table className="w-full text-sm">
+                                                                            <thead><tr className="text-xs text-inkLight font-black uppercase tracking-widest border-b border-borderSubtle">
+                                                                                <th className="text-left px-5 py-3">Shortcode</th>
+                                                                                <th className="text-left px-5 py-3">Surface</th>
+                                                                                <th className="text-right px-5 py-3">Clicks</th>
+                                                                                <th className="text-left px-5 py-3">Tracked URL</th>
+                                                                                <th className="px-5 py-3" />
+                                                                            </tr></thead>
+                                                                            <tbody className="divide-y divide-borderSubtle/50">
+                                                                                {ltDetailCampaign.links.map((link: any) => (
+                                                                                    <tr key={link.id} className="hover:bg-surface/50">
+                                                                                        <td className="px-5 py-3 font-mono text-xs text-gold">{link.shortcode}</td>
+                                                                                        <td className="px-5 py-3 text-inkLight text-xs">{link.surface}</td>
+                                                                                        <td className="px-5 py-3 text-right font-bold">{(link.click_count ?? 0).toLocaleString()}</td>
+                                                                                        <td className="px-5 py-3">
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <span className="font-mono text-xs text-inkLight truncate max-w-[180px]">{link.tracked_url}</span>
+                                                                                                <button onClick={() => navigator.clipboard.writeText(link.tracked_url).then(() => toast.success('Copied!'))} className="px-2 py-0.5 text-[10px] font-bold text-gold bg-gold/10 rounded hover:bg-gold/20 transition-colors shrink-0">Copy</button>
+                                                                                            </div>
+                                                                                        </td>
+                                                                                        <td className="px-5 py-3 text-right">
+                                                                                            <button onClick={async () => {
+                                                                                                if (!window.confirm('Detach this link?')) return;
+                                                                                                try {
+                                                                                                    await detachLTCampaignLink(ltDetailCampaign.id, link.id);
+                                                                                                    setLtDetailCampaign((prev: any) => ({ ...prev, links: prev.links.filter((l: any) => l.id !== link.id), link_count: prev.link_count - 1 }));
+                                                                                                    toast.success('Link detached');
+                                                                                                } catch (e: any) { toast.error(e.message); }
+                                                                                            }} className="text-xs text-red-400 hover:text-red-600 font-bold transition-colors">Detach</button>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                ))}
+                                                                            </tbody>
+                                                                        </table>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                /* Campaigns list view */
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <select value={ltCampaignPartnerFilter} onChange={e => setLtCampaignPartnerFilter(e.target.value)} className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60">
+                                                            <option value="">All Partners</option>
+                                                            {ltPartners.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+                                                        </select>
+                                                        <select value={ltCampaignStatusFilter} onChange={e => setLtCampaignStatusFilter(e.target.value)} className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60">
+                                                            <option value="all">All Status</option>
+                                                            <option value="active">Active</option>
+                                                            <option value="inactive">Inactive</option>
+                                                        </select>
+                                                        <button onClick={() => loadLtCampaigns()} className="p-2 border border-borderSubtle rounded-xl text-inkLight hover:text-ink transition-colors"><RefreshCw className="w-4 h-4" /></button>
+                                                        <button onClick={() => setLtAddingCampaignTop(v => !v)} className="ml-auto px-4 py-2 bg-gold text-canvas text-sm font-black rounded-xl hover:bg-gold/90 transition-colors">+ New Campaign</button>
+                                                    </div>
+
+                                                    {ltAddingCampaignTop && (
+                                                        <div className="bg-canvas border border-borderSubtle rounded-2xl p-5 space-y-3">
+                                                            <p className="text-xs font-black text-inkLight uppercase tracking-widest">New Campaign</p>
+                                                            <div className="grid grid-cols-2 gap-3">
+                                                                <select value={ltNewCampaignTopForm.partner_id} onChange={e => setLtNewCampaignTopForm(f => ({ ...f, partner_id: e.target.value }))} className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60">
+                                                                    <option value="">Select partner *</option>
+                                                                    {ltPartners.filter(p => p.is_active).map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+                                                                </select>
+                                                                <input type="text" placeholder="Campaign name *" value={ltNewCampaignTopForm.name} onChange={e => setLtNewCampaignTopForm(f => ({ ...f, name: e.target.value }))} className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60" />
+                                                                <input type="text" placeholder="Description (optional)" value={ltNewCampaignTopForm.description} onChange={e => setLtNewCampaignTopForm(f => ({ ...f, description: e.target.value }))} className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60" />
+                                                                <div className="flex gap-2">
+                                                                    <input type="date" value={ltNewCampaignTopForm.start_date} onChange={e => setLtNewCampaignTopForm(f => ({ ...f, start_date: e.target.value }))} className="flex-1 bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60" />
+                                                                    <input type="date" value={ltNewCampaignTopForm.end_date} onChange={e => setLtNewCampaignTopForm(f => ({ ...f, end_date: e.target.value }))} className="flex-1 bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60" />
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button onClick={async () => {
+                                                                    if (!ltNewCampaignTopForm.partner_id || !ltNewCampaignTopForm.name) { toast.error('Partner and name are required'); return; }
+                                                                    setLtCampaignTopSaving(true);
+                                                                    try {
+                                                                        const cam = await createLTCampaign({ partner_id: parseInt(ltNewCampaignTopForm.partner_id), name: ltNewCampaignTopForm.name, description: ltNewCampaignTopForm.description || undefined, start_date: ltNewCampaignTopForm.start_date || undefined, end_date: ltNewCampaignTopForm.end_date || undefined });
+                                                                        const partner = ltPartners.find(p => p.id === parseInt(ltNewCampaignTopForm.partner_id));
+                                                                        setLtCampaigns(prev => [{ ...cam, partner_name: partner?.name ?? '', link_count: 0, total_clicks: 0 } as LTCampaign, ...prev]);
+                                                                        setLtAddingCampaignTop(false);
+                                                                        setLtNewCampaignTopForm({ partner_id: '', name: '', description: '', start_date: '', end_date: '' });
+                                                                        toast.success('Campaign created');
+                                                                    } catch (e: any) { toast.error(e.message); } finally { setLtCampaignTopSaving(false); }
+                                                                }} disabled={ltCampaignTopSaving || !ltNewCampaignTopForm.partner_id || !ltNewCampaignTopForm.name} className="px-4 py-2 bg-gold text-canvas text-sm font-bold rounded-xl disabled:opacity-50">{ltCampaignTopSaving ? 'Creating…' : 'Create'}</button>
+                                                                <button onClick={() => setLtAddingCampaignTop(false)} className="px-4 py-2 border border-borderSubtle text-inkLight text-sm font-bold rounded-xl hover:text-ink">Cancel</button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="bg-canvas border border-borderSubtle rounded-2xl overflow-hidden">
+                                                        {ltCampaignsLoading ? (
+                                                            <div className="flex items-center gap-2 py-12 justify-center text-inkLight"><RefreshCw className="w-4 h-4 animate-spin" /></div>
+                                                        ) : ltCampaigns.filter(c => ltCampaignStatusFilter === 'all' || (ltCampaignStatusFilter === 'active' ? c.is_active : !c.is_active)).length === 0 ? (
+                                                            <p className="text-center text-inkLight text-sm py-12">No campaigns yet.</p>
+                                                        ) : (
+                                                            <table className="w-full text-sm">
+                                                                <thead>
+                                                                    <tr className="text-xs text-inkLight font-black uppercase tracking-widest border-b border-borderSubtle">
+                                                                        <th className="text-left px-5 py-3">Name</th>
+                                                                        <th className="text-left px-5 py-3">Partner</th>
+                                                                        <th className="text-left px-5 py-3">Date Range</th>
+                                                                        <th className="text-right px-5 py-3">Links</th>
+                                                                        <th className="text-right px-5 py-3">Clicks</th>
+                                                                        <th className="text-left px-5 py-3">Status</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-borderSubtle/50">
+                                                                    {ltCampaigns
+                                                                        .filter(c => ltCampaignStatusFilter === 'all' || (ltCampaignStatusFilter === 'active' ? c.is_active : !c.is_active))
+                                                                        .map(cam => (
+                                                                            <tr key={cam.id} className="hover:bg-surface/50 transition-colors cursor-pointer" onClick={() => openLtCampaignDetail(cam)}>
+                                                                                <td className="px-5 py-3 font-bold text-ink">{cam.name}</td>
+                                                                                <td className="px-5 py-3 text-inkLight">{cam.partner_name}</td>
+                                                                                <td className="px-5 py-3 text-xs text-inkLight">{[cam.start_date, cam.end_date].filter(Boolean).join(' → ') || 'Ongoing'}</td>
+                                                                                <td className="px-5 py-3 text-right font-bold text-ink">{cam.link_count}</td>
+                                                                                <td className="px-5 py-3 text-right font-bold text-ink">{cam.total_clicks?.toLocaleString() ?? 0}</td>
+                                                                                <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${cam.is_active ? 'bg-green-100 text-green-700' : 'bg-surface text-inkLight'}`}>{cam.is_active ? 'Active' : 'Ended'}</span></td>
+                                                                            </tr>
+                                                                        ))}
+                                                                </tbody>
+                                                            </table>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )
+                                        )}
+
                                         {/* ── Links ── */}
                                         {ltSubView === 'links' && (
                                             <div className="space-y-4">
@@ -1784,7 +2113,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                                     <div className="bg-canvas border border-borderSubtle rounded-2xl p-5 space-y-3">
                                                         <p className="text-xs font-black text-inkLight uppercase tracking-widest">New Link</p>
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                            <select value={ltNewLinkForm.partner_id} onChange={e => setLtNewLinkForm(f => ({ ...f, partner_id: e.target.value, campaign_id: '' }))} className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60">
+                                                            <select value={ltNewLinkForm.partner_id} onChange={e => setLtNewLinkForm(f => ({ ...f, partner_id: e.target.value }))} className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60">
                                                                 <option value="">Select partner *</option>
                                                                 {ltPartners.filter(p => p.is_active).map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
                                                             </select>
@@ -1811,11 +2140,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                                                     if (ltNewLinkForm.source_ref) body.source_ref = ltNewLinkForm.source_ref;
                                                                     if (ltNewLinkForm.label) body.label = ltNewLinkForm.label;
                                                                     if (ltNewLinkForm.campaign) body.campaign = ltNewLinkForm.campaign;
-                                                                    if (ltNewLinkForm.campaign_id) body.campaign_id = parseInt(ltNewLinkForm.campaign_id);
                                                                     if (ltNewLinkForm.shortcode) body.shortcode = ltNewLinkForm.shortcode;
                                                                     const result = await createLTLink(body);
                                                                     setLtNewLinkResult({ tracked_url: result.tracked_url, shortcode: result.shortcode });
-                                                                    setLtNewLinkForm({ partner_id: '', destination_url: '', surface: 'elio-article', campaign_id: '', campaign: '', source_ref: '', label: '', shortcode: '' });
+                                                                    setLtNewLinkForm({ partner_id: '', destination_url: '', surface: 'elio-article', campaign: '', source_ref: '', label: '', shortcode: '' });
                                                                     await loadLtLinks();
                                                                 } catch (err: any) {
                                                                     toast.error(err.message || 'Failed to create link');
@@ -1847,7 +2175,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                                                     <th className="text-left px-5 py-3">Shortcode</th>
                                                                     <th className="text-left px-5 py-3">Partner</th>
                                                                     <th className="text-left px-5 py-3">Surface</th>
-                                                                    <th className="text-left px-5 py-3">Campaign</th>
+                                                                    <th className="text-left px-5 py-3">Campaigns</th>
                                                                     <th className="text-right px-5 py-3">Clicks</th>
                                                                     <th className="text-left px-5 py-3">Status</th>
                                                                 </tr>
@@ -1858,7 +2186,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                                                         <td className="px-5 py-3 font-mono text-xs text-gold">{link.shortcode}{ltLinkDetailLoading && ltLinkDetailId === link.id && <span className="ml-1 text-inkLight">…</span>}</td>
                                                                         <td className="px-5 py-3 text-ink">{link.partner_name}</td>
                                                                         <td className="px-5 py-3 text-inkLight">{link.surface}</td>
-                                                                        <td className="px-5 py-3 text-inkLight text-xs">{link.campaign_name ?? link.campaign ?? '—'}</td>
+                                                                        <td className="px-5 py-3">
+                                                                            <div className="flex flex-wrap gap-1">
+                                                                                {link.campaigns?.length ? link.campaigns.map(c => (
+                                                                                    <button key={c.id} onClick={e => { e.stopPropagation(); setLtSubView('campaigns'); const cam = ltCampaigns.find(x => x.id === c.id); if (cam) openLtCampaignDetail(cam); }} className="px-1.5 py-0.5 bg-gold/10 text-gold text-[10px] font-bold rounded hover:bg-gold/20 transition-colors">{c.name}</button>
+                                                                                )) : <span className="text-inkLight text-xs">{link.campaign ?? '—'}</span>}
+                                                                            </div>
+                                                                        </td>
                                                                         <td className="px-5 py-3 text-right font-bold text-ink">{link.click_count?.toLocaleString() ?? '—'}</td>
                                                                         <td className="px-5 py-3"><span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black ${link.is_active ? 'bg-green-100 text-green-700' : 'bg-surface text-inkLight'}`}>{link.is_active ? 'Active' : 'Inactive'}</span></td>
                                                                     </tr>
@@ -2381,6 +2715,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                     </div>
                                 </div>
                             )}
+                            {/* Campaigns */}
+                            {ltLinkDetailModal.campaigns?.length > 0 && (
+                                <div className="mt-4 pt-4 border-t border-borderSubtle">
+                                    <p className="text-xs font-black text-inkLight uppercase tracking-widest mb-2">Campaigns</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {ltLinkDetailModal.campaigns.map((c: any) => (
+                                            <button key={c.id} onClick={() => { setLtLinkDetailModal(null); setLtSubView('campaigns'); const cam = ltCampaigns.find(x => x.id === c.id); if (cam) openLtCampaignDetail(cam); }} className="px-2 py-1 bg-gold/10 text-gold text-xs font-bold rounded-lg hover:bg-gold/20 transition-colors">{c.name}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </motion.div>
                     </motion.div>
                 )}
@@ -2508,6 +2853,94 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                         </tbody>
                                     </table>
                                 </div>
+                            )}
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Link Tracker — Attach Link Modal */}
+            <AnimatePresence>
+                {ltAttachLinkModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setLtAttachLinkModal(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-canvas border border-borderSubtle rounded-3xl shadow-2xl w-full max-w-2xl p-8 max-h-[85vh] overflow-y-auto"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <p className="font-black text-ink text-lg">Attach Links</p>
+                                    <p className="text-xs text-inkLight mt-0.5">Add existing links to "{ltAttachLinkModal.name}"</p>
+                                </div>
+                                <button onClick={() => setLtAttachLinkModal(null)} className="p-1.5 hover:bg-surface rounded-lg transition-colors">
+                                    <X className="w-4 h-4 text-inkLight" />
+                                </button>
+                            </div>
+                            {ltLinks.length === 0 ? (
+                                <p className="text-center text-inkLight text-sm py-8">No links available. Create links first.</p>
+                            ) : (
+                                <>
+                                    <div className="bg-surface rounded-2xl overflow-hidden mb-5 max-h-96 overflow-y-auto">
+                                        <table className="w-full text-sm">
+                                            <thead><tr className="text-xs text-inkLight font-black uppercase tracking-widest border-b border-borderSubtle bg-surface sticky top-0">
+                                                <th className="px-4 py-3 w-8" />
+                                                <th className="text-left px-4 py-3">Shortcode</th>
+                                                <th className="text-left px-4 py-3">Partner</th>
+                                                <th className="text-left px-4 py-3">Surface</th>
+                                            </tr></thead>
+                                            <tbody className="divide-y divide-borderSubtle/50">
+                                                {ltLinks.map(link => {
+                                                    const alreadyAttached = ltDetailCampaign?.links?.some((l: any) => l.id === link.id);
+                                                    return (
+                                                        <tr key={link.id} className={`transition-colors ${alreadyAttached ? 'opacity-40 cursor-not-allowed' : 'hover:bg-canvas cursor-pointer'}`} onClick={() => { if (alreadyAttached) return; setLtAttachLinkSelected(prev => prev.includes(link.id) ? prev.filter(id => id !== link.id) : [...prev, link.id]); }}>
+                                                            <td className="px-4 py-3"><input type="checkbox" checked={ltAttachLinkSelected.includes(link.id)} disabled={alreadyAttached} readOnly className="accent-gold" /></td>
+                                                            <td className="px-4 py-3 font-mono text-xs text-gold">{link.shortcode}</td>
+                                                            <td className="px-4 py-3 text-ink">{link.partner_name}</td>
+                                                            <td className="px-4 py-3 text-inkLight text-xs">{link.surface}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-inkLight">{ltAttachLinkSelected.length} selected</span>
+                                        <div className="flex gap-3">
+                                            <button onClick={() => setLtAttachLinkModal(null)} className="px-4 py-2 border border-borderSubtle text-inkLight text-sm font-bold rounded-xl hover:text-ink transition-colors">Cancel</button>
+                                            <button
+                                                onClick={async () => {
+                                                    if (ltAttachLinkSelected.length === 0) return;
+                                                    setLtAttachLinkSaving(true);
+                                                    try {
+                                                        await attachLTCampaignLinks(ltAttachLinkModal!.id, ltAttachLinkSelected);
+                                                        // Refresh detail
+                                                        const full = await ltFetch(`campaigns/${ltAttachLinkModal!.id}/`);
+                                                        setLtDetailCampaign(full);
+                                                        setLtCampaigns(prev => prev.map(c => c.id === ltAttachLinkModal!.id ? { ...c, link_count: full.link_count } : c));
+                                                        setLtAttachLinkModal(null);
+                                                        setLtAttachLinkSelected([]);
+                                                        toast.success(`${ltAttachLinkSelected.length} link(s) attached`);
+                                                    } catch (e: any) {
+                                                        toast.error(e.message || 'Failed to attach links');
+                                                    } finally {
+                                                        setLtAttachLinkSaving(false);
+                                                    }
+                                                }}
+                                                disabled={ltAttachLinkSaving || ltAttachLinkSelected.length === 0}
+                                                className="px-4 py-2 bg-gold text-canvas text-sm font-black rounded-xl hover:bg-gold/90 transition-colors disabled:opacity-50"
+                                            >{ltAttachLinkSaving ? 'Attaching…' : 'Attach Selected'}</button>
+                                        </div>
+                                    </div>
+                                </>
                             )}
                         </motion.div>
                     </motion.div>
