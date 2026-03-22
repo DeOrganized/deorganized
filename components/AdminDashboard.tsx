@@ -5,7 +5,8 @@ import {
     UserPlus, TrendingUp, Shield, CheckCircle, XCircle,
     Search, ChevronLeft, ChevronRight, AlertCircle,
     BarChart3, Eye, Clock, Filter, RefreshCw, Star,
-    ShoppingBag, Send, Zap, Settings, Layout, Globe, Bot, X, ExternalLink, Minus
+    ShoppingBag, Send, Zap, Settings, Layout, Globe, Bot, X, ExternalLink, Minus,
+    Crown, Trash2
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { API_BASE_URL, adminDapGrant, adminDapDeduct } from '../lib/api';
@@ -74,6 +75,25 @@ interface PaginatedResponse<T> {
     next: string | null;
     previous: string | null;
     results: T[];
+}
+
+interface AdminCommunity {
+    id: number;
+    name: string;
+    slug: string;
+    tier: string;
+    member_count: number;
+    post_count: number;
+    show_count: number;
+    founder: { id: number; username: string; profile_picture?: string } | null;
+    created_at: string;
+}
+
+interface CommunityAdminStats {
+    total_communities: number;
+    total_memberships: number;
+    communities_this_week: number;
+    most_active: { name: string; slug: string; post_count: number } | null;
 }
 
 // ============================================
@@ -174,13 +194,54 @@ async function updateFeedback(
     return res.json();
 }
 
+async function fetchAdminCommunities(ordering = '-member_count_annotated'): Promise<PaginatedResponse<AdminCommunity>> {
+    const token = await getValidAccessToken();
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch(`${API_BASE_URL}/communities/?ordering=${ordering}&page_size=200`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`Failed to fetch communities: ${res.status}`);
+    return res.json();
+}
+
+async function fetchCommunityAdminStats(): Promise<CommunityAdminStats> {
+    const token = await getValidAccessToken();
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch(`${API_BASE_URL}/communities/admin_stats/`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`Failed to fetch community stats: ${res.status}`);
+    return res.json();
+}
+
+async function patchCommunityTier(slug: string, tier: string): Promise<void> {
+    const token = await getValidAccessToken();
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier }),
+    });
+    if (!res.ok) throw new Error(`Failed to update tier: ${res.status}`);
+}
+
+async function deleteCommunityAdmin(slug: string): Promise<void> {
+    const token = await getValidAccessToken();
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`Failed to delete community: ${res.status}`);
+}
+
 // ============================================
 // Component
 // ============================================
 
-type AdminTab = 'overview' | 'users' | 'feedback' | 'playout' | 'agent-controller' | 'news-production' | 'settings';
+type AdminTab = 'overview' | 'users' | 'communities' | 'feedback' | 'playout' | 'agent-controller' | 'news-production' | 'settings';
 
-const ADMIN_VALID_TABS: AdminTab[] = ['overview', 'users', 'feedback', 'playout', 'agent-controller', 'news-production', 'settings'];
+const ADMIN_VALID_TABS: AdminTab[] = ['overview', 'users', 'communities', 'feedback', 'playout', 'agent-controller', 'news-production', 'settings'];
 
 function getAdminTabFromUrl(): AdminTab {
     const seg = window.location.pathname.split('/')[2];
@@ -342,6 +403,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     const [editingNote, setEditingNote] = useState<number | null>(null);
     const [noteText, setNoteText] = useState('');
 
+    // Communities tab state
+    const [communities, setCommunities] = useState<AdminCommunity[]>([]);
+    const [communityStats, setCommunityStats] = useState<CommunityAdminStats | null>(null);
+    const [communitiesLoading, setCommunitiesLoading] = useState(false);
+    const [communitiesSort, setCommunitiesSort] = useState('-member_count_annotated');
+    const [communityToDelete, setCommunityToDelete] = useState<AdminCommunity | null>(null);
+    const [deletingCommunity, setDeletingCommunity] = useState(false);
+    const [updatingTierFor, setUpdatingTierFor] = useState<string | null>(null);
+
     const isCreator = backendUser?.role === 'creator';
     const isStaff = backendUser?.is_staff;
 
@@ -363,6 +433,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     useEffect(() => {
         if (activeTab === 'feedback' && isStaff) loadFeedback();
     }, [activeTab, feedbackPage, isStaff]);
+
+    // Load communities when tab or sort changes
+    useEffect(() => {
+        if (activeTab === 'communities' && isStaff) loadCommunityData();
+    }, [activeTab, communitiesSort, isStaff]);
 
     // Check if user has staff access
     if (!isStaff) {
@@ -420,6 +495,51 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
         }
     };
 
+    const loadCommunityData = async () => {
+        setCommunitiesLoading(true);
+        try {
+            const [commData, statsData] = await Promise.all([
+                fetchAdminCommunities(communitiesSort),
+                fetchCommunityAdminStats(),
+            ]);
+            setCommunities(commData.results);
+            setCommunityStats(statsData);
+        } catch (err: any) {
+            toast.error('Failed to load communities: ' + err.message);
+        } finally {
+            setCommunitiesLoading(false);
+        }
+    };
+
+    const handleChangeTier = async (slug: string, tier: string) => {
+        setUpdatingTierFor(slug);
+        try {
+            await patchCommunityTier(slug, tier);
+            setCommunities(prev => prev.map(c => c.slug === slug ? { ...c, tier } : c));
+            toast.success('Tier updated');
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to update tier');
+        } finally {
+            setUpdatingTierFor(null);
+        }
+    };
+
+    const handleDeleteCommunity = async () => {
+        if (!communityToDelete) return;
+        setDeletingCommunity(true);
+        try {
+            await deleteCommunityAdmin(communityToDelete.slug);
+            setCommunities(prev => prev.filter(c => c.slug !== communityToDelete.slug));
+            setCommunityStats(prev => prev ? { ...prev, total_communities: prev.total_communities - 1 } : prev);
+            toast.success(`Deleted ${communityToDelete.name}`);
+            setCommunityToDelete(null);
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to delete community');
+        } finally {
+            setDeletingCommunity(false);
+        }
+    };
+
     const handleToggleVerification = async (userId: number) => {
         try {
             await toggleUserVerification(userId);
@@ -473,6 +593,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     const sidebarItems = [
         { id: 'overview' as AdminTab, label: 'Platform Stats', icon: BarChart3 },
         { id: 'users' as AdminTab, label: 'User Directory', icon: Users },
+        { id: 'communities' as AdminTab, label: 'Communities', icon: Crown },
         { id: 'feedback' as AdminTab, label: 'User Feedback', icon: MessageSquare },
         { id: 'playout' as AdminTab, label: 'Playout Engine', icon: Radio },
         { id: 'agent-controller' as AdminTab, label: 'Agent Controller', icon: Bot },
@@ -754,6 +875,142 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                             </motion.div>
                         )}
 
+                        {activeTab === 'communities' && (
+                            <motion.div key="communities" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                                {/* Stats Cards */}
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                                    {[
+                                        { label: 'Total Communities', value: communityStats?.total_communities ?? '—', icon: Crown, color: 'text-gold', bg: 'bg-orange-50' },
+                                        { label: 'Total Memberships', value: communityStats?.total_memberships ?? '—', icon: Users, color: 'text-blue-500', bg: 'bg-blue-50' },
+                                        { label: 'New This Week', value: communityStats?.communities_this_week ?? '—', icon: TrendingUp, color: 'text-green-500', bg: 'bg-green-50' },
+                                        { label: 'Most Active', value: communityStats?.most_active?.name ?? 'None', icon: BarChart3, color: 'text-purple-500', bg: 'bg-purple-50', isText: true },
+                                    ].map((stat) => (
+                                        <div key={stat.label} className="bg-canvas border border-borderSubtle rounded-[2rem] p-8 shadow-soft">
+                                            <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-2xl flex items-center justify-center mb-6`}>
+                                                <stat.icon className="w-6 h-6" />
+                                            </div>
+                                            <p className={`${(stat as any).isText ? 'text-xl' : 'text-4xl'} font-black text-ink truncate`}>{stat.value}</p>
+                                            <p className="text-sm font-bold text-inkLight mt-1">{stat.label}</p>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Table */}
+                                <div className="bg-canvas border border-borderSubtle rounded-[2rem] overflow-hidden shadow-soft">
+                                    <div className="px-8 py-5 bg-surface border-b border-borderSubtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                        <h3 className="font-black text-ink">
+                                            All Communities
+                                            <span className="ml-2 text-sm font-bold text-inkLight">({communities.length})</span>
+                                        </h3>
+                                        <div className="flex gap-2">
+                                            {[
+                                                { label: 'Members', key: 'member_count_annotated' },
+                                                { label: 'Newest', key: 'created_at' },
+                                            ].map(({ label, key }) => {
+                                                const asc = communitiesSort === key;
+                                                const desc = communitiesSort === `-${key}`;
+                                                return (
+                                                    <button
+                                                        key={key}
+                                                        onClick={() => setCommunitiesSort(desc ? key : `-${key}`)}
+                                                        className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-colors ${
+                                                            asc || desc
+                                                                ? 'border-gold/40 text-gold bg-gold/5'
+                                                                : 'border-borderSubtle text-inkLight hover:text-gold'
+                                                        }`}
+                                                    >
+                                                        {label} {desc ? '↓' : asc ? '↑' : ''}
+                                                    </button>
+                                                );
+                                            })}
+                                            <button
+                                                onClick={loadCommunityData}
+                                                className="p-1.5 rounded-xl border border-borderSubtle text-inkLight hover:text-gold transition-colors"
+                                            >
+                                                <RefreshCw className={`w-4 h-4 ${communitiesLoading ? 'animate-spin' : ''}`} />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {communitiesLoading && communities.length === 0 ? (
+                                        <div className="flex justify-center py-16">
+                                            <RefreshCw className="w-5 h-5 animate-spin text-inkLight" />
+                                        </div>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left min-w-[900px]">
+                                                <thead className="bg-surface/50 border-b border-borderSubtle">
+                                                    <tr>
+                                                        {['Community', 'Tier', 'Members', 'Shows', 'Posts', 'Founded By', 'Created', 'Actions'].map(h => (
+                                                            <th key={h} className="px-6 py-4 text-xs font-black text-inkLight uppercase tracking-widest whitespace-nowrap">
+                                                                {h}
+                                                            </th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-borderSubtle/50">
+                                                    {communities.map(c => (
+                                                        <tr key={c.id} className="hover:bg-surface/30 transition-colors">
+                                                            <td className="px-6 py-4">
+                                                                <p className="font-bold text-ink leading-tight">{c.name}</p>
+                                                                <p className="text-[11px] text-inkLight">/c/{c.slug}</p>
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <select
+                                                                    value={c.tier}
+                                                                    onChange={(e) => handleChangeTier(c.slug, e.target.value)}
+                                                                    disabled={updatingTierFor === c.slug}
+                                                                    className="bg-surface border border-borderSubtle rounded-xl px-3 py-1.5 text-xs font-bold text-ink focus:outline-none focus:border-gold/60 disabled:opacity-50 capitalize"
+                                                                >
+                                                                    {['free', 'creator', 'pro', 'enterprise'].map(t => (
+                                                                        <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </td>
+                                                            <td className="px-6 py-4 font-black text-ink">{c.member_count}</td>
+                                                            <td className="px-6 py-4 text-sm text-inkLight">{c.show_count ?? 0}</td>
+                                                            <td className="px-6 py-4 text-sm text-inkLight">{c.post_count ?? 0}</td>
+                                                            <td className="px-6 py-4">
+                                                                {c.founder ? (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-6 h-6 rounded-full bg-surface border border-borderSubtle flex items-center justify-center text-[10px] font-black text-inkLight shrink-0">
+                                                                            {c.founder.username[0].toUpperCase()}
+                                                                        </div>
+                                                                        <span className="text-xs font-bold text-inkLight truncate max-w-[80px]">{c.founder.username}</span>
+                                                                    </div>
+                                                                ) : <span className="text-inkLight/50">—</span>}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-xs text-inkLight whitespace-nowrap">
+                                                                {new Date(c.created_at).toLocaleDateString()}
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <div className="flex items-center gap-1 justify-end">
+                                                                    <button
+                                                                        onClick={() => onNavigate('community-page', c.slug)}
+                                                                        title="View community"
+                                                                        className="p-1.5 rounded-lg text-inkLight hover:text-gold hover:bg-gold/10 transition-colors"
+                                                                    >
+                                                                        <ExternalLink className="w-4 h-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => setCommunityToDelete(c)}
+                                                                        title="Delete community"
+                                                                        className="p-1.5 rounded-lg text-inkLight hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+
                         {activeTab === 'playout' && (
                             <motion.div
                                 key="playout"
@@ -941,6 +1198,58 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                     </button>
                                 </div>
                             )}
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Delete Community Confirmation Modal */}
+            <AnimatePresence>
+                {communityToDelete && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        onClick={() => !deletingCommunity && setCommunityToDelete(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-canvas border border-borderSubtle rounded-3xl shadow-2xl w-full max-w-sm p-8"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center">
+                                    <Trash2 className="w-6 h-6 text-red-500" />
+                                </div>
+                                <div>
+                                    <p className="font-black text-ink text-lg">Delete Community</p>
+                                    <p className="text-xs text-inkLight">This cannot be undone</p>
+                                </div>
+                            </div>
+                            <p className="text-sm text-inkLight mb-2">
+                                You are about to permanently delete:
+                            </p>
+                            <p className="font-black text-ink mb-1">{communityToDelete.name}</p>
+                            <p className="text-xs text-inkLight mb-8">/c/{communityToDelete.slug} · {communityToDelete.member_count} members</p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setCommunityToDelete(null)}
+                                    disabled={deletingCommunity}
+                                    className="flex-1 py-3 rounded-2xl border border-borderSubtle text-inkLight font-bold text-sm hover:text-ink hover:bg-surface transition-colors disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleDeleteCommunity}
+                                    disabled={deletingCommunity}
+                                    className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-black text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
+                                >
+                                    {deletingCommunity ? 'Deleting…' : 'Delete'}
+                                </button>
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}
