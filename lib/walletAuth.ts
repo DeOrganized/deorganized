@@ -28,6 +28,7 @@ export interface User {
     date_joined: string;
     follower_count?: number;
     following_count?: number;
+    tracking_opted_out?: boolean;
 }
 
 export interface Tokens {

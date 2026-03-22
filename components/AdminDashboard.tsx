@@ -11,6 +11,7 @@ import {
 import { useAuth } from '../lib/AuthContext';
 import { API_BASE_URL, adminDapGrant, adminDapDeduct } from '../lib/api';
 import { getValidAccessToken } from '../lib/walletAuth';
+import { trackEvent } from '../lib/engagement';
 import { MerchTracker } from './CreatorDashboard/MerchTracker';
 import { CommunityPosts } from './CreatorDashboard/CommunityPosts';
 import { PlayoutControl } from './PlayoutControl';
@@ -2644,6 +2645,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                 <div className="flex items-center gap-2 mb-5 p-3 bg-surface rounded-xl border border-borderSubtle">
                                     <p className="font-mono text-xs text-gold flex-1 truncate">{ltLinkDetailModal.tracked_url}</p>
                                     <button onClick={() => navigator.clipboard.writeText(ltLinkDetailModal.tracked_url).then(() => toast.success('Copied!'))} className="px-2 py-1 bg-gold/10 text-gold text-xs font-bold rounded-lg hover:bg-gold/20 transition-colors shrink-0">Copy</button>
+                                    <a
+                                        href={ltLinkDetailModal.tracked_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={() => trackEvent('ecosystem.outbound', {
+                                            entityType: 'link',
+                                            entityId: ltLinkDetailModal.shortcode,
+                                            partnerSlug: ltLinkDetailModal.partner_slug,
+                                            surface: ltLinkDetailModal.surface || 'admin-link-detail',
+                                            destinationUrl: ltLinkDetailModal.tracked_url,
+                                        })}
+                                        className="px-2 py-1 bg-gold/10 text-gold text-xs font-bold rounded-lg hover:bg-gold/20 transition-colors shrink-0"
+                                    >Visit</a>
                                 </div>
                             )}
                             {/* Destination */}
