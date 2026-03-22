@@ -97,7 +97,21 @@ const PostComposer: React.FC<PostComposerProps> = ({ communityId, communityName,
             fd.append('content', content.trim());
             fd.append('community', String(communityId));
             if (imageFile) fd.append('image', imageFile);
-            const post = await createPost(fd, accessToken);
+            const raw = await createPost(fd, accessToken);
+            // Ensure all display fields are present (backend may not return them on older deploys)
+            const post = {
+                like_count: 0,
+                comment_count: 0,
+                user_has_liked: false,
+                created_at: new Date().toISOString(),
+                ...raw,
+                author: raw.author ?? {
+                    id: backendUser?.id,
+                    username: (backendUser as any)?.username,
+                    profile_picture: (backendUser as any)?.profile_picture ?? null,
+                    is_verified: false,
+                },
+            };
             onPosted(post);
             setContent('');
             clearImage();
@@ -168,41 +182,55 @@ const PostComposer: React.FC<PostComposerProps> = ({ communityId, communityName,
 
 // ─── Post Card ────────────────────────────────────────────────────────────────
 
-const PostCard: React.FC<{ post: any }> = ({ post }) => (
-    <div className="bg-surface border border-borderSubtle rounded-2xl p-4">
-        <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-8 h-8 rounded-xl bg-canvas overflow-hidden shrink-0 flex items-center justify-center border border-borderSubtle">
-                {post.author?.profile_picture ? (
-                    <img src={getImageUrl(post.author.profile_picture) || ''} alt="" className="w-full h-full object-cover" />
-                ) : (
-                    <span className="text-xs font-black text-inkLight">
-                        {post.author?.username?.[0]?.toUpperCase()}
-                    </span>
-                )}
+const PostCard: React.FC<{ post: any; onNavigate?: (page: any, id?: string | number) => void }> = ({ post, onNavigate }) => {
+    const authorName = post.author?.display_name || post.author?.username || 'Unknown';
+    const avatarInitial = authorName[0]?.toUpperCase() ?? '?';
+    const timestamp = post.created_at ? timeAgo(post.created_at) : 'just now';
+
+    return (
+        <div className="bg-surface border border-borderSubtle rounded-2xl overflow-hidden">
+            <div className="flex items-center gap-2.5 p-4 pb-3">
+                <button
+                    className="w-8 h-8 rounded-xl bg-canvas overflow-hidden shrink-0 flex items-center justify-center border border-borderSubtle"
+                    onClick={() => post.author?.id && onNavigate?.('creator-detail', post.author.id)}
+                >
+                    {post.author?.profile_picture ? (
+                        <img src={getImageUrl(post.author.profile_picture) || ''} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                        <span className="text-xs font-black text-inkLight">{avatarInitial}</span>
+                    )}
+                </button>
+                <div className="flex-1 min-w-0">
+                    <button
+                        className="text-xs font-black text-ink leading-none hover:text-gold transition-colors"
+                        onClick={() => post.author?.id && onNavigate?.('creator-detail', post.author.id)}
+                    >
+                        {authorName}
+                    </button>
+                </div>
+                <span className="text-xs text-inkLight/60 shrink-0">{timestamp}</span>
             </div>
-            <div className="flex-1 min-w-0">
-                <p className="text-xs font-black text-ink leading-none">{post.author?.username}</p>
+            <p className="text-sm text-ink whitespace-pre-wrap leading-relaxed px-4 pb-3">{post.content}</p>
+            {post.image && (
+                <div className="px-4 pb-3">
+                    <img
+                        src={getImageUrl(post.image) || ''}
+                        alt=""
+                        className="rounded-xl w-full max-h-72 object-cover border border-borderSubtle overflow-hidden"
+                    />
+                </div>
+            )}
+            <div className="flex items-center gap-4 px-4 py-2.5 border-t border-borderSubtle text-xs text-inkLight">
+                <span className="flex items-center gap-1">
+                    <Heart className="w-3 h-3" /> {post.like_count ?? 0}
+                </span>
+                <span className="flex items-center gap-1">
+                    <MessageSquare className="w-3 h-3" /> {post.comment_count ?? 0}
+                </span>
             </div>
-            <span className="text-xs text-inkLight/60 shrink-0">{timeAgo(post.created_at)}</span>
         </div>
-        <p className="text-sm text-ink whitespace-pre-wrap leading-relaxed">{post.content}</p>
-        {post.image && (
-            <img
-                src={getImageUrl(post.image) || ''}
-                alt=""
-                className="mt-3 rounded-xl w-full max-h-72 object-cover"
-            />
-        )}
-        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-borderSubtle text-xs text-inkLight">
-            <span className="flex items-center gap-1">
-                <Heart className="w-3 h-3" /> {post.like_count ?? 0}
-            </span>
-            <span className="flex items-center gap-1">
-                <MessageSquare className="w-3 h-3" /> {post.comment_count ?? 0}
-            </span>
-        </div>
-    </div>
-);
+    );
+};
 
 // ─── Tab renderers ────────────────────────────────────────────────────────────
 
@@ -211,9 +239,10 @@ interface FeedTabProps {
     community: Community;
     isMember: boolean;
     onPostCreated: (post: any) => void;
+    onNavigate: (page: any, id?: string | number) => void;
 }
 
-const FeedTab: React.FC<FeedTabProps> = ({ posts, community, isMember, onPostCreated }) => (
+const FeedTab: React.FC<FeedTabProps> = ({ posts, community, isMember, onPostCreated, onNavigate }) => (
     <div>
         {isMember && (
             <PostComposer
@@ -230,7 +259,7 @@ const FeedTab: React.FC<FeedTabProps> = ({ posts, community, isMember, onPostCre
             />
         ) : (
             <div className="space-y-4">
-                {posts.map((post) => <PostCard key={post.id} post={post} />)}
+                {posts.map((post) => <PostCard key={post.id} post={post} onNavigate={onNavigate} />)}
             </div>
         )}
     </div>
@@ -624,6 +653,7 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
                                 community={community}
                                 isMember={isMember}
                                 onPostCreated={(post) => setFeedPosts((prev) => [post, ...prev])}
+                                onNavigate={onNavigate}
                             />
                         )}
                         {activeTab === 'shows' && (
