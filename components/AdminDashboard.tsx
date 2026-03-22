@@ -6,7 +6,7 @@ import {
     Search, ChevronLeft, ChevronRight, AlertCircle,
     BarChart3, Eye, Clock, Filter, RefreshCw, Star,
     ShoppingBag, Send, Zap, Settings, Layout, Globe, Bot, X, ExternalLink, Minus,
-    Crown, Trash2
+    Crown, Trash2, Link2
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { API_BASE_URL, adminDapGrant, adminDapDeduct } from '../lib/api';
@@ -94,6 +94,52 @@ interface CommunityAdminStats {
     total_memberships: number;
     communities_this_week: number;
     most_active: { name: string; slug: string; post_count: number } | null;
+}
+
+interface LTPartner {
+    id: number;
+    name: string;
+    slug: string;
+    active: boolean;
+    created_at: string;
+}
+
+interface LTLink {
+    id: number;
+    shortcode: string;
+    partner_id: number;
+    partner_name: string;
+    destination_url: string;
+    surface: string;
+    active: boolean;
+    total_clicks: number;
+    created_at: string;
+}
+
+interface LTKey {
+    id: number;
+    name: string;
+    scope: string;
+    partner_id: number | null;
+    partner_name: string | null;
+    last_used_at: string | null;
+    created_at: string;
+}
+
+interface LTGroupedRow {
+    shortcode: string;
+    partner_name: string;
+    surface: string;
+    total_clicks: number;
+    unique_ips: number;
+}
+
+interface LTLinkStats {
+    shortcode: string;
+    total_clicks: number;
+    unique_ips: number;
+    clicks_by_country: Record<string, number>;
+    clicks_by_day: { date: string; count: number }[];
 }
 
 // ============================================
@@ -235,13 +281,55 @@ async function deleteCommunityAdmin(slug: string): Promise<void> {
     if (!res.ok) throw new Error(`Failed to delete community: ${res.status}`);
 }
 
+// ── Link Tracker API helpers ──────────────────────────────────────────────────
+
+function daysAgoISO(days: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return d.toISOString().slice(0, 10);
+}
+
+async function ltFetch(path: string, init: RequestInit = {}): Promise<any> {
+    const token = await getValidAccessToken();
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch(`${API_BASE_URL}/link-tracker/${path}`, {
+        ...init,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init.headers as object | undefined) },
+    });
+    if (res.status === 204) return null;
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || data?.detail || `Request failed: ${res.status}`);
+    return data;
+}
+
+const fetchLTPartners = () => ltFetch('partners/');
+const createLTPartner = (body: object) => ltFetch('partners/', { method: 'POST', body: JSON.stringify(body) });
+const updateLTPartner = (id: number, body: object) => ltFetch(`partners/${id}/`, { method: 'PUT', body: JSON.stringify(body) });
+const deleteLTPartner = (id: number) => ltFetch(`partners/${id}/`, { method: 'DELETE' });
+
+const fetchLTLinks = (params: Record<string, string> = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return ltFetch(`links/${qs ? '?' + qs : ''}`);
+};
+const createLTLink = (body: object) => ltFetch('links/', { method: 'POST', body: JSON.stringify(body) });
+const fetchLTLinkStats = (shortcode: string) => ltFetch(`links/${shortcode}/stats/`);
+
+const fetchLTAnalytics = (params: Record<string, string> = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return ltFetch(`analytics/${qs ? '?' + qs : ''}`);
+};
+
+const fetchLTKeys = () => ltFetch('keys/');
+const createLTKey = (body: object) => ltFetch('keys/', { method: 'POST', body: JSON.stringify(body) });
+const deleteLTKey = (id: number) => ltFetch(`keys/${id}/`, { method: 'DELETE' });
+
 // ============================================
 // Component
 // ============================================
 
-type AdminTab = 'overview' | 'users' | 'communities' | 'feedback' | 'playout' | 'agent-controller' | 'news-production' | 'settings';
+type AdminTab = 'overview' | 'users' | 'communities' | 'feedback' | 'playout' | 'agent-controller' | 'news-production' | 'link-tracker' | 'settings';
 
-const ADMIN_VALID_TABS: AdminTab[] = ['overview', 'users', 'communities', 'feedback', 'playout', 'agent-controller', 'news-production', 'settings'];
+const ADMIN_VALID_TABS: AdminTab[] = ['overview', 'users', 'communities', 'feedback', 'playout', 'agent-controller', 'news-production', 'link-tracker', 'settings'];
 
 function getAdminTabFromUrl(): AdminTab {
     const seg = window.location.pathname.split('/')[2];
@@ -412,6 +500,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     const [deletingCommunity, setDeletingCommunity] = useState(false);
     const [updatingTierFor, setUpdatingTierFor] = useState<string | null>(null);
 
+    // Link Tracker tab state
+    const [ltSubView, setLtSubView] = useState<'dashboard' | 'partners' | 'links' | 'keys'>('dashboard');
+    // Dashboard sub-view
+    const [ltDashRows, setLtDashRows] = useState<LTGroupedRow[]>([]);
+    const [ltDashLoading, setLtDashLoading] = useState(false);
+    const [ltDashDays, setLtDashDays] = useState<'7' | '30' | '90'>('30');
+    const [ltDashTotal, setLtDashTotal] = useState(0);
+    // Partners sub-view
+    const [ltPartners, setLtPartners] = useState<LTPartner[]>([]);
+    const [ltPartnersLoading, setLtPartnersLoading] = useState(false);
+    const [ltEditingPartner, setLtEditingPartner] = useState<LTPartner | null>(null);
+    const [ltPartnerForm, setLtPartnerForm] = useState({ name: '', slug: '', active: true });
+    const [ltPartnerSaving, setLtPartnerSaving] = useState(false);
+    const [ltAddingPartner, setLtAddingPartner] = useState(false);
+    const [ltNewPartnerForm, setLtNewPartnerForm] = useState({ name: '', slug: '' });
+    // Links sub-view
+    const [ltLinks, setLtLinks] = useState<LTLink[]>([]);
+    const [ltLinksLoading, setLtLinksLoading] = useState(false);
+    const [ltLinksPartnerFilter, setLtLinksPartnerFilter] = useState('');
+    const [ltLinkStatsModal, setLtLinkStatsModal] = useState<LTLinkStats | null>(null);
+    const [ltLinkStatsShortcode, setLtLinkStatsShortcode] = useState('');
+    const [ltLinkStatsLoading, setLtLinkStatsLoading] = useState(false);
+    const [ltAddingLink, setLtAddingLink] = useState(false);
+    const [ltNewLinkForm, setLtNewLinkForm] = useState({ partner_id: '', destination_url: '', surface: 'bio' });
+    const [ltLinkSaving, setLtLinkSaving] = useState(false);
+    // Keys sub-view
+    const [ltKeys, setLtKeys] = useState<LTKey[]>([]);
+    const [ltKeysLoading, setLtKeysLoading] = useState(false);
+    const [ltNewKeyResult, setLtNewKeyResult] = useState<{ key: string; name: string } | null>(null);
+    const [ltNewKeyForm, setLtNewKeyForm] = useState({ name: '', scope: 'read', partner_id: '' });
+    const [ltKeySaving, setLtKeySaving] = useState(false);
+
     const isCreator = backendUser?.role === 'creator';
     const isStaff = backendUser?.is_staff;
 
@@ -438,6 +558,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     useEffect(() => {
         if (activeTab === 'communities' && isStaff) loadCommunityData();
     }, [activeTab, communitiesSort, isStaff]);
+
+    // Load link tracker data when tab or sub-view changes
+    useEffect(() => {
+        if (activeTab !== 'link-tracker' || !isStaff) return;
+        if (ltSubView === 'dashboard') loadLtDashboard();
+        if (ltSubView === 'partners') loadLtPartners();
+        if (ltSubView === 'links') loadLtLinks();
+        if (ltSubView === 'keys') loadLtKeys();
+    }, [activeTab, ltSubView, isStaff]);
+
+    useEffect(() => {
+        if (activeTab === 'link-tracker' && ltSubView === 'dashboard' && isStaff) loadLtDashboard();
+    }, [ltDashDays]);
+
+    useEffect(() => {
+        if (activeTab === 'link-tracker' && ltSubView === 'links' && isStaff) loadLtLinks();
+    }, [ltLinksPartnerFilter]);
 
     // Check if user has staff access
     if (!isStaff) {
@@ -508,6 +645,58 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
             toast.error('Failed to load communities: ' + err.message);
         } finally {
             setCommunitiesLoading(false);
+        }
+    };
+
+    const loadLtDashboard = async () => {
+        setLtDashLoading(true);
+        try {
+            const data = await fetchLTAnalytics({ group_by: 'shortcode', from: daysAgoISO(parseInt(ltDashDays)) });
+            const rows: LTGroupedRow[] = Array.isArray(data) ? data : (data.rows ?? data.results ?? []);
+            setLtDashRows(rows);
+            setLtDashTotal(rows.reduce((s: number, r: LTGroupedRow) => s + r.total_clicks, 0));
+        } catch (err: any) {
+            toast.error('Failed to load analytics: ' + err.message);
+        } finally {
+            setLtDashLoading(false);
+        }
+    };
+
+    const loadLtPartners = async () => {
+        setLtPartnersLoading(true);
+        try {
+            const data = await fetchLTPartners();
+            setLtPartners(Array.isArray(data) ? data : (data.partners ?? data.results ?? []));
+        } catch (err: any) {
+            toast.error('Failed to load partners: ' + err.message);
+        } finally {
+            setLtPartnersLoading(false);
+        }
+    };
+
+    const loadLtLinks = async () => {
+        setLtLinksLoading(true);
+        try {
+            const params: Record<string, string> = {};
+            if (ltLinksPartnerFilter) params.partner_id = ltLinksPartnerFilter;
+            const data = await fetchLTLinks(params);
+            setLtLinks(Array.isArray(data) ? data : (data.links ?? data.results ?? []));
+        } catch (err: any) {
+            toast.error('Failed to load links: ' + err.message);
+        } finally {
+            setLtLinksLoading(false);
+        }
+    };
+
+    const loadLtKeys = async () => {
+        setLtKeysLoading(true);
+        try {
+            const data = await fetchLTKeys();
+            setLtKeys(Array.isArray(data) ? data : (data.keys ?? data.results ?? []));
+        } catch (err: any) {
+            toast.error('Failed to load keys: ' + err.message);
+        } finally {
+            setLtKeysLoading(false);
         }
     };
 
@@ -598,6 +787,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
         { id: 'playout' as AdminTab, label: 'Playout Engine', icon: Radio },
         { id: 'agent-controller' as AdminTab, label: 'Agent Controller', icon: Bot },
         { id: 'news-production' as AdminTab, label: 'News Production', icon: Newspaper },
+        { id: 'link-tracker' as AdminTab, label: 'Link Tracker', icon: Link2 },
         { id: 'settings' as AdminTab, label: 'Preferences', icon: Settings },
     ];
 
@@ -664,7 +854,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                 <div className="max-w-6xl mx-auto space-y-8">
                     {/* Header Section — hidden for tabs that render their own header */}
                     <div className={`flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 ${
-                        activeTab === 'playout' || activeTab === 'agent-controller' || activeTab === 'news-production' ? 'hidden' : ''
+                        activeTab === 'playout' || activeTab === 'agent-controller' || activeTab === 'news-production' || activeTab === 'link-tracker' ? 'hidden' : ''
                     }`}>
                         <div>
                             <h1 className="text-3xl md:text-4xl font-black text-ink">
@@ -1049,6 +1239,470 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                             </motion.div>
                         )}
 
+                        {activeTab === 'link-tracker' && (
+                            <motion.div
+                                key="link-tracker"
+                                initial={{ opacity: 0, scale: 0.98 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.98 }}
+                                className="space-y-6"
+                            >
+                                {/* Header */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h1 className="text-3xl font-black text-ink">Link Tracker</h1>
+                                        <p className="text-inkLight mt-1">Attribution links, analytics, and API key management.</p>
+                                    </div>
+                                </div>
+
+                                {/* Sub-nav */}
+                                <div className="flex gap-2">
+                                    {(['dashboard', 'partners', 'links', 'keys'] as const).map(v => (
+                                        <button
+                                            key={v}
+                                            onClick={() => setLtSubView(v)}
+                                            className={`px-4 py-2 rounded-xl text-sm font-bold capitalize transition-all ${
+                                                ltSubView === v
+                                                    ? 'bg-ink text-canvas'
+                                                    : 'bg-surface text-inkLight hover:text-ink border border-borderSubtle'
+                                            }`}
+                                        >{v}</button>
+                                    ))}
+                                </div>
+
+                                {/* ── Dashboard ── */}
+                                {ltSubView === 'dashboard' && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex gap-2">
+                                                {(['7', '30', '90'] as const).map(d => (
+                                                    <button
+                                                        key={d}
+                                                        onClick={() => setLtDashDays(d)}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                                            ltDashDays === d
+                                                                ? 'bg-gold text-canvas'
+                                                                : 'bg-surface text-inkLight hover:text-ink border border-borderSubtle'
+                                                        }`}
+                                                    >{d}d</button>
+                                                ))}
+                                            </div>
+                                            <a
+                                                href={`${API_BASE_URL}/link-tracker/analytics/export/?from=${daysAgoISO(parseInt(ltDashDays))}`}
+                                                download
+                                                className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-inkLight hover:text-ink border border-borderSubtle rounded-lg transition-colors"
+                                            >
+                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                Export CSV
+                                            </a>
+                                        </div>
+
+                                        <div className="bg-canvas border border-borderSubtle rounded-2xl p-4">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <p className="text-xs font-black text-inkLight uppercase tracking-widest">Click Summary</p>
+                                                <span className="text-xs font-bold text-inkLight">Total: {ltDashTotal.toLocaleString()}</span>
+                                            </div>
+                                            {ltDashLoading ? (
+                                                <div className="flex items-center gap-2 py-8 justify-center text-inkLight">
+                                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                                </div>
+                                            ) : ltDashRows.length === 0 ? (
+                                                <p className="text-center text-inkLight text-sm py-8">No click data yet.</p>
+                                            ) : (
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-sm">
+                                                        <thead>
+                                                            <tr className="text-xs text-inkLight font-black uppercase tracking-widest">
+                                                                <th className="text-left pb-3">Shortcode</th>
+                                                                <th className="text-left pb-3">Partner</th>
+                                                                <th className="text-left pb-3">Surface</th>
+                                                                <th className="text-right pb-3">Clicks</th>
+                                                                <th className="text-right pb-3">Unique IPs</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-borderSubtle/50">
+                                                            {ltDashRows.map(row => (
+                                                                <tr key={row.shortcode} className="hover:bg-surface/50 transition-colors">
+                                                                    <td className="py-2.5 font-mono text-xs text-gold">{row.shortcode}</td>
+                                                                    <td className="py-2.5 text-ink">{row.partner_name}</td>
+                                                                    <td className="py-2.5 text-inkLight capitalize">{row.surface}</td>
+                                                                    <td className="py-2.5 text-right font-bold text-ink">{row.total_clicks.toLocaleString()}</td>
+                                                                    <td className="py-2.5 text-right text-inkLight">{row.unique_ips.toLocaleString()}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ── Partners ── */}
+                                {ltSubView === 'partners' && (
+                                    <div className="space-y-4">
+                                        <div className="flex justify-end">
+                                            <button
+                                                onClick={() => setLtAddingPartner(true)}
+                                                className="px-4 py-2 bg-gold text-canvas text-sm font-black rounded-xl hover:bg-gold/90 transition-colors"
+                                            >+ New Partner</button>
+                                        </div>
+
+                                        {ltAddingPartner && (
+                                            <div className="bg-canvas border border-borderSubtle rounded-2xl p-5 space-y-3">
+                                                <p className="text-xs font-black text-inkLight uppercase tracking-widest">New Partner</p>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Name"
+                                                        value={ltNewPartnerForm.name}
+                                                        onChange={e => setLtNewPartnerForm(p => ({ ...p, name: e.target.value }))}
+                                                        className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="slug (auto-generated if blank)"
+                                                        value={ltNewPartnerForm.slug}
+                                                        onChange={e => setLtNewPartnerForm(p => ({ ...p, slug: e.target.value }))}
+                                                        className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink font-mono focus:outline-none focus:border-gold/60"
+                                                    />
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (!ltNewPartnerForm.name) return;
+                                                            setLtPartnerSaving(true);
+                                                            try {
+                                                                await createLTPartner({ name: ltNewPartnerForm.name, slug: ltNewPartnerForm.slug || undefined });
+                                                                setLtAddingPartner(false);
+                                                                setLtNewPartnerForm({ name: '', slug: '' });
+                                                                await loadLtPartners();
+                                                                toast.success('Partner created');
+                                                            } catch (err: any) {
+                                                                toast.error(err.message || 'Failed to create partner');
+                                                            } finally {
+                                                                setLtPartnerSaving(false);
+                                                            }
+                                                        }}
+                                                        disabled={ltPartnerSaving || !ltNewPartnerForm.name}
+                                                        className="px-4 py-2 bg-gold text-canvas text-sm font-bold rounded-xl disabled:opacity-50"
+                                                    >{ltPartnerSaving ? 'Creating…' : 'Create'}</button>
+                                                    <button
+                                                        onClick={() => { setLtAddingPartner(false); setLtNewPartnerForm({ name: '', slug: '' }); }}
+                                                        className="px-4 py-2 border border-borderSubtle text-inkLight text-sm font-bold rounded-xl hover:text-ink transition-colors"
+                                                    >Cancel</button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="bg-canvas border border-borderSubtle rounded-2xl overflow-hidden">
+                                            {ltPartnersLoading ? (
+                                                <div className="flex items-center gap-2 py-12 justify-center text-inkLight">
+                                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                                </div>
+                                            ) : ltPartners.length === 0 ? (
+                                                <p className="text-center text-inkLight text-sm py-12">No partners yet.</p>
+                                            ) : (
+                                                <table className="w-full text-sm">
+                                                    <thead>
+                                                        <tr className="text-xs text-inkLight font-black uppercase tracking-widest border-b border-borderSubtle">
+                                                            <th className="text-left px-5 py-3">Name</th>
+                                                            <th className="text-left px-5 py-3">Slug</th>
+                                                            <th className="text-left px-5 py-3">Status</th>
+                                                            <th className="text-left px-5 py-3">Created</th>
+                                                            <th className="px-5 py-3" />
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-borderSubtle/50">
+                                                        {ltPartners.map(p => (
+                                                            <tr key={p.id} className="hover:bg-surface/50 transition-colors">
+                                                                <td className="px-5 py-3 font-bold text-ink">{p.name}</td>
+                                                                <td className="px-5 py-3 font-mono text-xs text-inkLight">{p.slug}</td>
+                                                                <td className="px-5 py-3">
+                                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                                                        p.active ? 'bg-green-100 text-green-700' : 'bg-surface text-inkLight'
+                                                                    }`}>{p.active ? 'Active' : 'Inactive'}</span>
+                                                                </td>
+                                                                <td className="px-5 py-3 text-inkLight text-xs">{timeAgo(p.created_at)}</td>
+                                                                <td className="px-5 py-3 text-right">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setLtEditingPartner(p);
+                                                                            setLtPartnerForm({ name: p.name, slug: p.slug, active: p.active });
+                                                                        }}
+                                                                        className="text-xs text-inkLight hover:text-gold font-bold transition-colors"
+                                                                    >Edit</button>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ── Links ── */}
+                                {ltSubView === 'links' && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <select
+                                                value={ltLinksPartnerFilter}
+                                                onChange={e => setLtLinksPartnerFilter(e.target.value)}
+                                                className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
+                                            >
+                                                <option value="">All Partners</option>
+                                                {ltPartners.map(p => (
+                                                    <option key={p.id} value={String(p.id)}>{p.name}</option>
+                                                ))}
+                                            </select>
+                                            <button
+                                                onClick={() => loadLtLinks()}
+                                                className="p-2 border border-borderSubtle rounded-xl text-inkLight hover:text-ink transition-colors"
+                                            ><RefreshCw className="w-4 h-4" /></button>
+                                            <button
+                                                onClick={() => setLtAddingLink(true)}
+                                                className="ml-auto px-4 py-2 bg-gold text-canvas text-sm font-black rounded-xl hover:bg-gold/90 transition-colors"
+                                            >+ New Link</button>
+                                        </div>
+
+                                        {ltAddingLink && (
+                                            <div className="bg-canvas border border-borderSubtle rounded-2xl p-5 space-y-3">
+                                                <p className="text-xs font-black text-inkLight uppercase tracking-widest">New Link</p>
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                    <select
+                                                        value={ltNewLinkForm.partner_id}
+                                                        onChange={e => setLtNewLinkForm(f => ({ ...f, partner_id: e.target.value }))}
+                                                        className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
+                                                    >
+                                                        <option value="">Select partner…</option>
+                                                        {ltPartners.filter(p => p.active).map(p => (
+                                                            <option key={p.id} value={String(p.id)}>{p.name}</option>
+                                                        ))}
+                                                    </select>
+                                                    <input
+                                                        type="url"
+                                                        placeholder="Destination URL"
+                                                        value={ltNewLinkForm.destination_url}
+                                                        onChange={e => setLtNewLinkForm(f => ({ ...f, destination_url: e.target.value }))}
+                                                        className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
+                                                    />
+                                                    <select
+                                                        value={ltNewLinkForm.surface}
+                                                        onChange={e => setLtNewLinkForm(f => ({ ...f, surface: e.target.value }))}
+                                                        className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
+                                                    >
+                                                        {['bio', 'newsletter', 'podcast', 'social', 'blog', 'ad', 'collab', 'other'].map(s => (
+                                                            <option key={s} value={s}>{s}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (!ltNewLinkForm.partner_id || !ltNewLinkForm.destination_url) return;
+                                                            setLtLinkSaving(true);
+                                                            try {
+                                                                await createLTLink({
+                                                                    partner_id: parseInt(ltNewLinkForm.partner_id),
+                                                                    destination_url: ltNewLinkForm.destination_url,
+                                                                    surface: ltNewLinkForm.surface,
+                                                                });
+                                                                setLtAddingLink(false);
+                                                                setLtNewLinkForm({ partner_id: '', destination_url: '', surface: 'bio' });
+                                                                await loadLtLinks();
+                                                                toast.success('Link created');
+                                                            } catch (err: any) {
+                                                                toast.error(err.message || 'Failed to create link');
+                                                            } finally {
+                                                                setLtLinkSaving(false);
+                                                            }
+                                                        }}
+                                                        disabled={ltLinkSaving || !ltNewLinkForm.partner_id || !ltNewLinkForm.destination_url}
+                                                        className="px-4 py-2 bg-gold text-canvas text-sm font-bold rounded-xl disabled:opacity-50"
+                                                    >{ltLinkSaving ? 'Creating…' : 'Create'}</button>
+                                                    <button
+                                                        onClick={() => { setLtAddingLink(false); setLtNewLinkForm({ partner_id: '', destination_url: '', surface: 'bio' }); }}
+                                                        className="px-4 py-2 border border-borderSubtle text-inkLight text-sm font-bold rounded-xl hover:text-ink transition-colors"
+                                                    >Cancel</button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="bg-canvas border border-borderSubtle rounded-2xl overflow-hidden">
+                                            {ltLinksLoading ? (
+                                                <div className="flex items-center gap-2 py-12 justify-center text-inkLight">
+                                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                                </div>
+                                            ) : ltLinks.length === 0 ? (
+                                                <p className="text-center text-inkLight text-sm py-12">No links yet.</p>
+                                            ) : (
+                                                <table className="w-full text-sm">
+                                                    <thead>
+                                                        <tr className="text-xs text-inkLight font-black uppercase tracking-widest border-b border-borderSubtle">
+                                                            <th className="text-left px-5 py-3">Shortcode</th>
+                                                            <th className="text-left px-5 py-3">Partner</th>
+                                                            <th className="text-left px-5 py-3">Surface</th>
+                                                            <th className="text-left px-5 py-3">Destination</th>
+                                                            <th className="text-right px-5 py-3">Clicks</th>
+                                                            <th className="text-left px-5 py-3">Status</th>
+                                                            <th className="px-5 py-3" />
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-borderSubtle/50">
+                                                        {ltLinks.map(link => (
+                                                            <tr key={link.id} className="hover:bg-surface/50 transition-colors">
+                                                                <td className="px-5 py-3 font-mono text-xs text-gold">{link.shortcode}</td>
+                                                                <td className="px-5 py-3 text-ink">{link.partner_name}</td>
+                                                                <td className="px-5 py-3 text-inkLight capitalize">{link.surface}</td>
+                                                                <td className="px-5 py-3 max-w-xs truncate text-inkLight text-xs">{link.destination_url}</td>
+                                                                <td className="px-5 py-3 text-right font-bold text-ink">{link.total_clicks?.toLocaleString() ?? '—'}</td>
+                                                                <td className="px-5 py-3">
+                                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                                                        link.active ? 'bg-green-100 text-green-700' : 'bg-surface text-inkLight'
+                                                                    }`}>{link.active ? 'Active' : 'Inactive'}</span>
+                                                                </td>
+                                                                <td className="px-5 py-3 text-right">
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            setLtLinkStatsShortcode(link.shortcode);
+                                                                            setLtLinkStatsLoading(true);
+                                                                            try {
+                                                                                const stats = await fetchLTLinkStats(link.shortcode);
+                                                                                setLtLinkStatsModal(stats);
+                                                                            } catch (err: any) {
+                                                                                toast.error('Failed to load stats: ' + err.message);
+                                                                            } finally {
+                                                                                setLtLinkStatsLoading(false);
+                                                                            }
+                                                                        }}
+                                                                        className="text-xs text-inkLight hover:text-gold font-bold transition-colors"
+                                                                    >{ltLinkStatsLoading && ltLinkStatsShortcode === link.shortcode ? '…' : 'Stats'}</button>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ── Keys ── */}
+                                {ltSubView === 'keys' && (
+                                    <div className="space-y-4">
+                                        <div className="bg-canvas border border-borderSubtle rounded-2xl p-5 space-y-3">
+                                            <p className="text-xs font-black text-inkLight uppercase tracking-widest">Generate API Key</p>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Key name"
+                                                    value={ltNewKeyForm.name}
+                                                    onChange={e => setLtNewKeyForm(f => ({ ...f, name: e.target.value }))}
+                                                    className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
+                                                />
+                                                <select
+                                                    value={ltNewKeyForm.scope}
+                                                    onChange={e => setLtNewKeyForm(f => ({ ...f, scope: e.target.value }))}
+                                                    className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
+                                                >
+                                                    <option value="admin">admin</option>
+                                                    <option value="write">write</option>
+                                                    <option value="read">read</option>
+                                                    <option value="partner-read">partner-read</option>
+                                                </select>
+                                                <select
+                                                    value={ltNewKeyForm.partner_id}
+                                                    onChange={e => setLtNewKeyForm(f => ({ ...f, partner_id: e.target.value }))}
+                                                    className="bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
+                                                >
+                                                    <option value="">No partner (global)</option>
+                                                    {ltPartners.map(p => (
+                                                        <option key={p.id} value={String(p.id)}>{p.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <button
+                                                onClick={async () => {
+                                                    if (!ltNewKeyForm.name) return;
+                                                    setLtKeySaving(true);
+                                                    try {
+                                                        const body: Record<string, any> = { name: ltNewKeyForm.name, scope: ltNewKeyForm.scope };
+                                                        if (ltNewKeyForm.partner_id) body.partner_id = parseInt(ltNewKeyForm.partner_id);
+                                                        const result = await createLTKey(body);
+                                                        setLtNewKeyResult({ key: result.key, name: ltNewKeyForm.name });
+                                                        setLtNewKeyForm({ name: '', scope: 'read', partner_id: '' });
+                                                        await loadLtKeys();
+                                                    } catch (err: any) {
+                                                        toast.error(err.message || 'Failed to create key');
+                                                    } finally {
+                                                        setLtKeySaving(false);
+                                                    }
+                                                }}
+                                                disabled={ltKeySaving || !ltNewKeyForm.name}
+                                                className="px-4 py-2 bg-gold text-canvas text-sm font-black rounded-xl hover:bg-gold/90 transition-colors disabled:opacity-50"
+                                            >{ltKeySaving ? 'Generating…' : 'Generate Key'}</button>
+                                        </div>
+
+                                        <div className="bg-canvas border border-borderSubtle rounded-2xl overflow-hidden">
+                                            {ltKeysLoading ? (
+                                                <div className="flex items-center gap-2 py-12 justify-center text-inkLight">
+                                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                                </div>
+                                            ) : ltKeys.length === 0 ? (
+                                                <p className="text-center text-inkLight text-sm py-12">No API keys yet.</p>
+                                            ) : (
+                                                <table className="w-full text-sm">
+                                                    <thead>
+                                                        <tr className="text-xs text-inkLight font-black uppercase tracking-widest border-b border-borderSubtle">
+                                                            <th className="text-left px-5 py-3">Name</th>
+                                                            <th className="text-left px-5 py-3">Scope</th>
+                                                            <th className="text-left px-5 py-3">Partner</th>
+                                                            <th className="text-left px-5 py-3">Last Used</th>
+                                                            <th className="text-left px-5 py-3">Created</th>
+                                                            <th className="px-5 py-3" />
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-borderSubtle/50">
+                                                        {ltKeys.map(k => (
+                                                            <tr key={k.id} className="hover:bg-surface/50 transition-colors">
+                                                                <td className="px-5 py-3 font-bold text-ink">{k.name}</td>
+                                                                <td className="px-5 py-3">
+                                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                                                        k.scope === 'admin' ? 'bg-red-100 text-red-700'
+                                                                        : k.scope === 'write' ? 'bg-blue-100 text-blue-700'
+                                                                        : 'bg-surface text-inkLight'
+                                                                    }`}>{k.scope}</span>
+                                                                </td>
+                                                                <td className="px-5 py-3 text-inkLight">{k.partner_name ?? '—'}</td>
+                                                                <td className="px-5 py-3 text-inkLight text-xs">{k.last_used_at ? timeAgo(k.last_used_at) : 'Never'}</td>
+                                                                <td className="px-5 py-3 text-inkLight text-xs">{timeAgo(k.created_at)}</td>
+                                                                <td className="px-5 py-3 text-right">
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            if (!window.confirm(`Delete key "${k.name}"?`)) return;
+                                                                            try {
+                                                                                await deleteLTKey(k.id);
+                                                                                setLtKeys(prev => prev.filter(x => x.id !== k.id));
+                                                                                toast.success('Key deleted');
+                                                                            } catch (err: any) {
+                                                                                toast.error(err.message || 'Failed to delete key');
+                                                                            }
+                                                                        }}
+                                                                        className="text-xs text-red-400 hover:text-red-600 font-bold transition-colors"
+                                                                    >Delete</button>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+
                         {activeTab === 'settings' && (
                             <motion.div key="settings" className="text-center py-20 grayscale opacity-40">
                                 <Settings className="w-16 h-16 mx-auto mb-4" />
@@ -1196,6 +1850,201 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                     >
                                         {zeroOutSaving ? 'Zeroing out…' : '⚡ Zero Out Balance'}
                                     </button>
+                                </div>
+                            )}
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Link Tracker — Partner Edit Modal */}
+            <AnimatePresence>
+                {ltEditingPartner && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setLtEditingPartner(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-canvas border border-borderSubtle rounded-3xl shadow-2xl w-full max-w-sm p-8"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between mb-6">
+                                <p className="font-black text-ink text-lg">Edit Partner</p>
+                                <button onClick={() => setLtEditingPartner(null)} className="p-1.5 hover:bg-surface rounded-lg transition-colors">
+                                    <X className="w-4 h-4 text-inkLight" />
+                                </button>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-black text-inkLight uppercase tracking-widest mb-1.5">Name</label>
+                                    <input
+                                        type="text"
+                                        value={ltPartnerForm.name}
+                                        onChange={e => setLtPartnerForm(f => ({ ...f, name: e.target.value }))}
+                                        className="w-full bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-black text-inkLight uppercase tracking-widest mb-1.5">Slug</label>
+                                    <input
+                                        type="text"
+                                        value={ltPartnerForm.slug}
+                                        onChange={e => setLtPartnerForm(f => ({ ...f, slug: e.target.value }))}
+                                        className="w-full bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink font-mono focus:outline-none focus:border-gold/60"
+                                    />
+                                </div>
+                                <div className="flex items-center justify-between py-2">
+                                    <div>
+                                        <p className="font-bold text-ink text-sm">Active</p>
+                                        <p className="text-xs text-inkLight">Inactive partners cannot receive clicks</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setLtPartnerForm(f => ({ ...f, active: !f.active }))}
+                                        className={`relative w-11 h-6 rounded-full transition-colors ${ltPartnerForm.active ? 'bg-gold' : 'bg-borderSubtle'}`}
+                                    >
+                                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${ltPartnerForm.active ? 'translate-x-5' : 'translate-x-0'}`} />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={async () => {
+                                        if (!ltEditingPartner) return;
+                                        setLtPartnerSaving(true);
+                                        try {
+                                            await updateLTPartner(ltEditingPartner.id, ltPartnerForm);
+                                            setLtPartners(prev => prev.map(p => p.id === ltEditingPartner.id ? { ...p, ...ltPartnerForm } : p));
+                                            setLtEditingPartner(null);
+                                            toast.success('Partner updated');
+                                        } catch (err: any) {
+                                            toast.error(err.message || 'Failed to update partner');
+                                        } finally {
+                                            setLtPartnerSaving(false);
+                                        }
+                                    }}
+                                    disabled={ltPartnerSaving}
+                                    className="flex-1 py-3 bg-gold text-canvas font-black rounded-2xl hover:bg-gold/90 transition-colors disabled:opacity-50"
+                                >{ltPartnerSaving ? 'Saving…' : 'Save'}</button>
+                                <button
+                                    onClick={async () => {
+                                        if (!ltEditingPartner || !window.confirm(`Delete partner "${ltEditingPartner.name}"?`)) return;
+                                        try {
+                                            await deleteLTPartner(ltEditingPartner.id);
+                                            setLtPartners(prev => prev.filter(p => p.id !== ltEditingPartner.id));
+                                            setLtEditingPartner(null);
+                                            toast.success('Partner deleted');
+                                        } catch (err: any) {
+                                            toast.error(err.message || 'Failed to delete partner');
+                                        }
+                                    }}
+                                    className="px-4 py-3 border border-red-500/30 text-red-500 font-bold rounded-2xl hover:bg-red-50 transition-colors text-sm"
+                                >Delete</button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Link Tracker — New Key Modal */}
+            <AnimatePresence>
+                {ltNewKeyResult && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-canvas border border-borderSubtle rounded-3xl shadow-2xl w-full max-w-md p-8"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="w-12 h-12 rounded-2xl bg-green-100 flex items-center justify-center">
+                                    <CheckCircle className="w-6 h-6 text-green-600" />
+                                </div>
+                                <div>
+                                    <p className="font-black text-ink text-lg">API Key Generated</p>
+                                    <p className="text-xs text-inkLight">Copy it now — it will not be shown again</p>
+                                </div>
+                            </div>
+                            <p className="text-xs font-black text-inkLight uppercase tracking-widest mb-2">{ltNewKeyResult.name}</p>
+                            <div className="bg-surface border border-borderSubtle rounded-xl p-4 mb-6">
+                                <p className="font-mono text-sm text-gold break-all select-all">{ltNewKeyResult.key}</p>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => navigator.clipboard.writeText(ltNewKeyResult!.key).then(() => toast.success('Copied!'))}
+                                    className="flex-1 py-3 bg-gold text-canvas font-black rounded-2xl hover:bg-gold/90 transition-colors"
+                                >Copy Key</button>
+                                <button
+                                    onClick={() => setLtNewKeyResult(null)}
+                                    className="flex-1 py-3 border border-borderSubtle text-inkLight font-bold rounded-2xl hover:text-ink transition-colors"
+                                >Close</button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Link Tracker — Link Stats Modal */}
+            <AnimatePresence>
+                {ltLinkStatsModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setLtLinkStatsModal(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-canvas border border-borderSubtle rounded-3xl shadow-2xl w-full max-w-md p-8"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <p className="font-black text-ink text-lg font-mono">{ltLinkStatsModal.shortcode}</p>
+                                    <p className="text-xs text-inkLight">Link statistics</p>
+                                </div>
+                                <button onClick={() => setLtLinkStatsModal(null)} className="p-1.5 hover:bg-surface rounded-lg transition-colors">
+                                    <X className="w-4 h-4 text-inkLight" />
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div className="bg-surface rounded-2xl p-4 text-center">
+                                    <p className="text-3xl font-black text-ink">{ltLinkStatsModal.total_clicks.toLocaleString()}</p>
+                                    <p className="text-xs text-inkLight font-bold mt-1">Total Clicks</p>
+                                </div>
+                                <div className="bg-surface rounded-2xl p-4 text-center">
+                                    <p className="text-3xl font-black text-ink">{ltLinkStatsModal.unique_ips.toLocaleString()}</p>
+                                    <p className="text-xs text-inkLight font-bold mt-1">Unique IPs</p>
+                                </div>
+                            </div>
+                            {Object.keys(ltLinkStatsModal.clicks_by_country).length > 0 && (
+                                <div>
+                                    <p className="text-xs font-black text-inkLight uppercase tracking-widest mb-3">By Country</p>
+                                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                        {Object.entries(ltLinkStatsModal.clicks_by_country)
+                                            .sort(([, a], [, b]) => b - a)
+                                            .slice(0, 10)
+                                            .map(([country, count]) => (
+                                                <div key={country} className="flex items-center justify-between text-sm">
+                                                    <span className="text-ink font-bold">{country}</span>
+                                                    <span className="text-inkLight">{(count as number).toLocaleString()}</span>
+                                                </div>
+                                            ))}
+                                    </div>
                                 </div>
                             )}
                         </motion.div>
