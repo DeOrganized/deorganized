@@ -627,7 +627,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                         <div className="flex justify-between items-end">
                            <div>
                               <h1 className="text-4xl font-bold text-ink mb-2">
-                                 {backendUser.role === 'creator' ? 'Creator Hub' : 'Dashboard'}
+                                 Studio
                               </h1>
                               <p className="text-inkLight font-medium">Manage your content, earnings, and community.</p>
                            </div>

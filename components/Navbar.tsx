@@ -229,7 +229,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 className={`relative text-sm font-medium transition-colors ${currentPage === 'dashboard' ? 'text-gold' : 'text-inkLight hover:text-gold'
                   }`}
               >
-                {backendUser.role === 'creator' ? 'Studio' : 'Dashboard'}
+                Studio
                 {unreadNotifications > 0 && (
                   <span className="absolute -top-1 -right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                     {unreadNotifications > 9 ? '9+' : unreadNotifications}
@@ -305,7 +305,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 onClick={() => handleNavClick('dashboard')}
                 className="text-lg font-medium text-left text-ink hover:text-gold"
               >
-                {backendUser.role === 'creator' ? 'Creator Studio' : 'Dashboard'}
+                Studio
               </button>
               <button
                 onClick={() => handleNavClick('user-profile')}

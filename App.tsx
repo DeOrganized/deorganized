@@ -50,7 +50,7 @@ function parseUrl(pathname: string): { page: PageView; id: string | number | nul
     case 'admin':
       return { page: 'admin', id: param }; // param holds the tab name if present
     case 'community':
-      return { page: 'community', id: null };
+      return { page: 'communities', id: null }; // redirect old /community to /communities
     case 'playout':
       return { page: 'playout-control', id: null };
     case 'register':
@@ -85,7 +85,7 @@ function pageToUrl(page: PageView, id?: string | number | null): string {
     case 'user-profile': return '/profile';
     case 'edit-profile': return '/edit-profile';
     case 'admin': return id ? `/admin/${id}` : '/admin';
-    case 'community': return '/community';
+    case 'community': return '/communities';
     case 'playout-control': return '/playout';
     case 'register': return '/register';
     case 'agents': return '/agents';
@@ -161,7 +161,7 @@ const AppContent: React.FC = () => {
       case 'admin':
         return <AdminDashboard onNavigate={handleNavigate} />;
       case 'community':
-        return <CommunityFeed onNavigate={handleNavigate} />;
+        return <CommunitiesDiscovery onNavigate={handleNavigate} />;
       case 'playout-control':
         return <PlayoutControl onNavigate={handleNavigate} />;
       case 'register':
