@@ -883,12 +883,17 @@ export const AnalyticsEcosystem: React.FC = () => {
 
                             {/* Umami summary cards */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {[
-                                    { label: 'Active Now', value: overviewStats?.active_visitors ?? '—', sub: 'visitors' },
-                                    { label: 'Unique Visitors', value: overviewStats?.stats?.uniques?.value ?? '—', sub: overviewStats?.stats?.uniques?.change != null ? `${overviewStats.stats.uniques.change >= 0 ? '+' : ''}${overviewStats.stats.uniques.change} vs prev` : '' },
-                                    { label: 'Pageviews', value: overviewStats?.stats?.pageviews?.value ?? '—', sub: overviewStats?.stats?.pageviews?.change != null ? `${overviewStats.stats.pageviews.change >= 0 ? '+' : ''}${overviewStats.stats.pageviews.change} vs prev` : '' },
-                                    { label: 'Sessions', value: overviewStats?.stats?.visits?.value ?? '—', sub: '' },
-                                ].map(({ label, value, sub }) => (
+                                {(() => {
+                                    const s = overviewStats?.stats ?? {};
+                                    const delta = (stat: any) => stat?.value != null && stat?.prev != null ? stat.value - stat.prev : null;
+                                    const fmtDelta = (d: number | null) => d == null ? '' : `${d >= 0 ? '+' : ''}${d.toLocaleString()} vs prev`;
+                                    return [
+                                        { label: 'Active Now', value: overviewStats?.active_visitors ?? '—', sub: 'visitors' },
+                                        { label: 'Unique Visitors', value: s.visitors?.value ?? '—', sub: fmtDelta(delta(s.visitors)) },
+                                        { label: 'Pageviews', value: s.pageviews?.value ?? '—', sub: fmtDelta(delta(s.pageviews)) },
+                                        { label: 'Sessions', value: s.visits?.value ?? '—', sub: fmtDelta(delta(s.visits)) },
+                                    ];
+                                })().map(({ label, value, sub }) => (
                                     <div key={label} className="bg-canvas border border-borderSubtle rounded-2xl p-4">
                                         <div className="text-xs text-inkLight font-bold uppercase tracking-wide mb-1">{label}</div>
                                         <div className="text-2xl font-black text-ink">{overviewLoading ? '…' : value?.toLocaleString?.() ?? value}</div>
@@ -954,17 +959,24 @@ export const AnalyticsEcosystem: React.FC = () => {
 
                             {/* Stats cards */}
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                {[
-                                    { label: 'Pageviews', value: trafficStats?.stats?.pageviews?.value, change: trafficStats?.stats?.pageviews?.change },
-                                    { label: 'Unique Visitors', value: trafficStats?.stats?.uniques?.value, change: trafficStats?.stats?.uniques?.change },
-                                    { label: 'Sessions', value: trafficStats?.stats?.visits?.value, change: trafficStats?.stats?.visits?.change },
-                                    { label: 'Bounce Rate', value: trafficStats?.stats?.bounces?.value != null ? `${Math.round((trafficStats.stats.bounces.value / Math.max(trafficStats.stats.visits?.value ?? 1, 1)) * 100)}%` : '—', change: null },
-                                    { label: 'Avg Visit Time', value: trafficStats?.stats?.totaltime?.value != null ? `${Math.round(trafficStats.stats.totaltime.value / Math.max(trafficStats.stats.visits?.value ?? 1, 1))}s` : '—', change: null },
-                                ].map(({ label, value, change }) => (
+                                {(() => {
+                                    const s = trafficStats?.stats ?? {};
+                                    const delta = (stat: any) => stat?.value != null && stat?.prev != null ? stat.value - stat.prev : null;
+                                    const visits = s.visits?.value ?? 0;
+                                    const bounceRate = s.bounces?.value != null ? `${Math.round((s.bounces.value / Math.max(visits, 1)) * 100)}%` : '—';
+                                    const avgTime = s.totaltime?.value != null ? `${Math.round(s.totaltime.value / Math.max(visits, 1))}s` : '—';
+                                    return [
+                                        { label: 'Pageviews', value: s.pageviews?.value, d: delta(s.pageviews) },
+                                        { label: 'Unique Visitors', value: s.visitors?.value, d: delta(s.visitors) },
+                                        { label: 'Sessions', value: s.visits?.value, d: delta(s.visits) },
+                                        { label: 'Bounce Rate', value: bounceRate, d: null },
+                                        { label: 'Avg Visit Time', value: avgTime, d: null },
+                                    ];
+                                })().map(({ label, value, d }) => (
                                     <div key={label} className="bg-canvas border border-borderSubtle rounded-2xl p-4">
                                         <div className="text-xs text-inkLight font-bold uppercase tracking-wide mb-1">{label}</div>
                                         <div className="text-xl font-black text-ink">{trafficLoading ? '…' : (value?.toLocaleString?.() ?? value ?? '—')}</div>
-                                        {change != null && <div className={`text-xs mt-0.5 ${change >= 0 ? 'text-green-500' : 'text-red-400'}`}>{change >= 0 ? '+' : ''}{change} vs prev</div>}
+                                        {d != null && <div className={`text-xs mt-0.5 ${d >= 0 ? 'text-green-500' : 'text-red-400'}`}>{d >= 0 ? '+' : ''}{d.toLocaleString()} vs prev</div>}
                                     </div>
                                 ))}
                             </div>
