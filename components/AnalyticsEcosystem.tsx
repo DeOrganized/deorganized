@@ -883,21 +883,15 @@ export const AnalyticsEcosystem: React.FC = () => {
 
                             {/* Umami summary cards */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {(() => {
-                                    const s = overviewStats?.stats ?? {};
-                                    const delta = (stat: any) => stat?.value != null && stat?.prev != null ? stat.value - stat.prev : null;
-                                    const fmtDelta = (d: number | null) => d == null ? '' : `${d >= 0 ? '+' : ''}${d.toLocaleString()} vs prev`;
-                                    return [
-                                        { label: 'Active Now', value: overviewStats?.active_visitors ?? '—', sub: 'visitors' },
-                                        { label: 'Unique Visitors', value: s.visitors?.value ?? '—', sub: fmtDelta(delta(s.visitors)) },
-                                        { label: 'Pageviews', value: s.pageviews?.value ?? '—', sub: fmtDelta(delta(s.pageviews)) },
-                                        { label: 'Sessions', value: s.visits?.value ?? '—', sub: fmtDelta(delta(s.visits)) },
-                                    ];
-                                })().map(({ label, value, sub }) => (
+                                {[
+                                    { label: 'Active Now', value: overviewStats?.active_visitors },
+                                    { label: 'Unique Visitors', value: overviewStats?.stats?.visitors },
+                                    { label: 'Pageviews', value: overviewStats?.stats?.pageviews },
+                                    { label: 'Sessions', value: overviewStats?.stats?.visits },
+                                ].map(({ label, value }) => (
                                     <div key={label} className="bg-canvas border border-borderSubtle rounded-2xl p-4">
                                         <div className="text-xs text-inkLight font-bold uppercase tracking-wide mb-1">{label}</div>
-                                        <div className="text-2xl font-black text-ink">{overviewLoading ? '…' : value?.toLocaleString?.() ?? value}</div>
-                                        {sub && <div className="text-xs text-inkLight mt-0.5">{sub}</div>}
+                                        <div className="text-2xl font-black text-ink">{overviewLoading ? '…' : (value?.toLocaleString?.() ?? '—')}</div>
                                     </div>
                                 ))}
                             </div>
@@ -961,22 +955,20 @@ export const AnalyticsEcosystem: React.FC = () => {
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                                 {(() => {
                                     const s = trafficStats?.stats ?? {};
-                                    const delta = (stat: any) => stat?.value != null && stat?.prev != null ? stat.value - stat.prev : null;
-                                    const visits = s.visits?.value ?? 0;
-                                    const bounceRate = s.bounces?.value != null ? `${Math.round((s.bounces.value / Math.max(visits, 1)) * 100)}%` : '—';
-                                    const avgTime = s.totaltime?.value != null ? `${Math.round(s.totaltime.value / Math.max(visits, 1))}s` : '—';
+                                    const visits = s.visits ?? 0;
+                                    const bounceRate = s.bounces != null ? `${Math.round((s.bounces / Math.max(visits, 1)) * 100)}%` : null;
+                                    const avgTime = s.totaltime != null ? `${Math.round(s.totaltime / Math.max(visits, 1))}s` : null;
                                     return [
-                                        { label: 'Pageviews', value: s.pageviews?.value, d: delta(s.pageviews) },
-                                        { label: 'Unique Visitors', value: s.visitors?.value, d: delta(s.visitors) },
-                                        { label: 'Sessions', value: s.visits?.value, d: delta(s.visits) },
-                                        { label: 'Bounce Rate', value: bounceRate, d: null },
-                                        { label: 'Avg Visit Time', value: avgTime, d: null },
+                                        { label: 'Pageviews', value: s.pageviews },
+                                        { label: 'Unique Visitors', value: s.visitors },
+                                        { label: 'Sessions', value: s.visits },
+                                        { label: 'Bounce Rate', value: bounceRate },
+                                        { label: 'Avg Visit Time', value: avgTime },
                                     ];
-                                })().map(({ label, value, d }) => (
+                                })().map(({ label, value }) => (
                                     <div key={label} className="bg-canvas border border-borderSubtle rounded-2xl p-4">
                                         <div className="text-xs text-inkLight font-bold uppercase tracking-wide mb-1">{label}</div>
                                         <div className="text-xl font-black text-ink">{trafficLoading ? '…' : (value?.toLocaleString?.() ?? value ?? '—')}</div>
-                                        {d != null && <div className={`text-xs mt-0.5 ${d >= 0 ? 'text-green-500' : 'text-red-400'}`}>{d >= 0 ? '+' : ''}{d.toLocaleString()} vs prev</div>}
                                     </div>
                                 ))}
                             </div>
