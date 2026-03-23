@@ -237,6 +237,41 @@ const fetchUmamiPageviews = (period: string, unit = 'day') => engagementAdminFet
 const fetchUmamiMetrics = (period: string, type: string, limit = 20) => engagementAdminFetch(`admin/umami/metrics/?period=${period}&type=${type}&limit=${limit}`);
 const fetchEngagementStats = (period: string) => engagementAdminFetch(`admin/stats/?period=${period}`);
 const fetchEngagementJourney = (userId: string) => engagementAdminFetch(`admin/journey/${userId}/`);
+const fetchDAPEconomy = (period: string) => engagementAdminFetch(`admin/dap/economy/?period=${period}`);
+const fetchDAPConfig = () => engagementAdminFetch(`admin/dap/config/`);
+
+async function engagementAdminPatch(path: string, body: object): Promise<any> {
+    const token = await getValidAccessToken();
+    if (!token) throw new Error('Not authenticated');
+    const res = await fetch(`${API_BASE_URL}/engagement/${path}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || data?.detail || `Request failed: ${res.status}`);
+    }
+    return res.json();
+}
+
+const saveDAPConfig = (data: object) => engagementAdminPatch('admin/dap/config/', data);
+
+// Pivot daily_flow array [{day, action, events}] into per-day chart objects
+function buildDAPFlowChartData(daily_flow: any[]): any[] {
+    const map: Record<string, any> = {};
+    for (const row of (daily_flow ?? [])) {
+        const day = String(row.day).slice(0, 10);
+        if (!map[day]) map[day] = { date: day };
+        const key = row.action === 'dap.deposit' ? 'deposit'
+            : row.action === 'dap.credit_spend' ? 'spend'
+            : row.action === 'dap.credit_earned' ? 'earned'
+            : row.action === 'dap.admin_grant' ? 'grant'
+            : null;
+        if (key) map[day][key] = (map[day][key] ?? 0) + (row.events ?? 0);
+    }
+    return Object.values(map).sort((a, b) => a.date.localeCompare(b.date));
+}
 
 // Merge Umami pageview time-series with Engagement daily time-series into one chart array
 function buildCombinedChartData(pageviewsRes: any, engagementDaily: any[]): any[] {
@@ -373,6 +408,15 @@ export const AnalyticsEcosystem: React.FC = () => {
     const [engJourneyUser, setEngJourneyUser] = useState('');
     const [engJourneyData, setEngJourneyData] = useState<any>(null);
     const [engJourneyLoading, setEngJourneyLoading] = useState(false);
+
+    // DAP Economy
+    const [dapPeriod, setDapPeriod] = useState('30d');
+    const [dapEconomy, setDapEconomy] = useState<any>(null);
+    const [dapEconomyLoading, setDapEconomyLoading] = useState(false);
+    const [dapConfig, setDapConfig] = useState<any>(null);
+    const [dapConfigForm, setDapConfigForm] = useState<Record<string, any>>({});
+    const [dapConfigLoading, setDapConfigLoading] = useState(false);
+    const [dapConfigSaving, setDapConfigSaving] = useState(false);
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -567,6 +611,55 @@ export const AnalyticsEcosystem: React.FC = () => {
         }
     };
 
+    const loadDAPEconomy = async (period = dapPeriod) => {
+        setDapEconomyLoading(true);
+        try {
+            const data = await fetchDAPEconomy(period);
+            setDapEconomy(data);
+        } catch (err: any) {
+            toast.error('Failed to load DAP economy: ' + err.message);
+        } finally {
+            setDapEconomyLoading(false);
+        }
+    };
+
+    const loadDAPConfig = async () => {
+        setDapConfigLoading(true);
+        try {
+            const data = await fetchDAPConfig();
+            setDapConfig(data);
+            setDapConfigForm({
+                reward_wallet_signup: data.rewards?.wallet_signup,
+                reward_creator_upgrade: data.rewards?.creator_upgrade,
+                reward_follow_peacelovemusic: data.rewards?.follow_peacelovemusic,
+                price_playout_upload: data.pricing?.playout_upload,
+                price_content_generation: data.pricing?.content_generation,
+                tier_starter: data.tiers?.starter,
+                tier_active: data.tiers?.active,
+                tier_power: data.tiers?.power,
+                tier_whale: data.tiers?.whale,
+                stx_to_credits_rate: data.exchange_rate,
+            });
+        } catch (err: any) {
+            toast.error('Failed to load DAP config: ' + err.message);
+        } finally {
+            setDapConfigLoading(false);
+        }
+    };
+
+    const handleSaveDAPConfig = async () => {
+        setDapConfigSaving(true);
+        try {
+            await saveDAPConfig(dapConfigForm);
+            toast.success('Config saved');
+            loadDAPConfig();
+        } catch (err: any) {
+            toast.error(err.message || 'Save failed');
+        } finally {
+            setDapConfigSaving(false);
+        }
+    };
+
     // ── Effects ───────────────────────────────────────────────────────────────
 
     useEffect(() => {
@@ -578,6 +671,7 @@ export const AnalyticsEcosystem: React.FC = () => {
         if (ltSubView === 'overview') loadOverview();
         if (ltSubView === 'traffic') loadTraffic();
         if (ltSubView === 'engagement') loadEngagement();
+        if (ltSubView === 'dap-economy') { loadDAPEconomy(); loadDAPConfig(); }
     }, [ltSubView, isStaff]);
 
     useEffect(() => {
@@ -599,6 +693,10 @@ export const AnalyticsEcosystem: React.FC = () => {
     useEffect(() => {
         if (ltSubView === 'engagement' && isStaff) loadEngagement(engPeriod);
     }, [engPeriod]);
+
+    useEffect(() => {
+        if (ltSubView === 'dap-economy' && isStaff) loadDAPEconomy(dapPeriod);
+    }, [dapPeriod]);
 
     // ── Render ────────────────────────────────────────────────────────────────
 
@@ -1768,7 +1866,243 @@ export const AnalyticsEcosystem: React.FC = () => {
                         </div>
                     )}
                     {ltSubView === 'dap-economy' && (
-                        <div className="p-8 text-inkLight">DAP Economy — coming soon</div>
+                        <div className="space-y-8">
+
+                            {/* ── Economy Dashboard ─────────────────────────── */}
+                            <div className="space-y-6">
+                                {/* Header + period selector */}
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-lg font-black text-ink">DAP Economy</h2>
+                                    <div className="flex gap-1">
+                                        {(['24h', '7d', '30d', '90d'] as const).map(p => (
+                                            <button key={p} onClick={() => setDapPeriod(p)}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${dapPeriod === p ? 'bg-ink text-canvas' : 'bg-surface text-inkLight hover:text-ink border border-borderSubtle'}`}>
+                                                {p}
+                                            </button>
+                                        ))}
+                                        <button onClick={() => loadDAPEconomy(dapPeriod)} className="ml-2 p-1.5 rounded-lg bg-surface border border-borderSubtle text-inkLight hover:text-ink transition-colors">
+                                            <RefreshCw className={`w-3.5 h-3.5 ${dapEconomyLoading ? 'animate-spin' : ''}`} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Summary cards */}
+                                {(() => {
+                                    const s = dapEconomy?.summary;
+                                    const minted = (s?.deposits?.total_credits ?? 0) + (s?.earned?.total_credits ?? 0) + (s?.admin_grants?.total_credits ?? 0);
+                                    const spent = s?.spends?.total_credits ?? 0;
+                                    return (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                                            {[
+                                                { label: 'DAP Active Users', value: s?.dap_active_users },
+                                                { label: 'Credits Minted', value: minted },
+                                                { label: 'Credits Spent', value: spent },
+                                                { label: 'Net Flow', value: minted - spent },
+                                                { label: 'Balance Zero Events', value: s?.balance_zero_events },
+                                                { label: 'STX Deposited', value: s?.deposits?.total_stx },
+                                            ].map(({ label, value }) => (
+                                                <div key={label} className="bg-canvas border border-borderSubtle rounded-2xl p-4">
+                                                    <div className="text-xs text-inkLight font-bold uppercase tracking-wide mb-1 leading-tight">{label}</div>
+                                                    <div className="text-xl font-black text-ink">{dapEconomyLoading ? '…' : (value?.toLocaleString?.() ?? '—')}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* Daily flow chart */}
+                                {(() => {
+                                    const data = buildDAPFlowChartData(dapEconomy?.daily_flow);
+                                    if (data.length === 0) return (
+                                        <div className="bg-canvas border border-borderSubtle rounded-2xl p-8 text-center text-inkLight text-sm">No credit flow data for this period</div>
+                                    );
+                                    return (
+                                        <div className="bg-canvas border border-borderSubtle rounded-2xl p-6">
+                                            <h3 className="text-sm font-bold text-inkLight mb-4">Daily Credit Flow</h3>
+                                            <ResponsiveContainer width="100%" height={220}>
+                                                <BarChart data={data} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-subtle, #e5e7eb)" />
+                                                    <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={d => d.slice(5)} />
+                                                    <YAxis tick={{ fontSize: 11 }} />
+                                                    <Tooltip />
+                                                    <Legend />
+                                                    <Bar dataKey="deposit" stackId="mint" fill="#f59e0b" name="Deposit" radius={[0, 0, 0, 0]} />
+                                                    <Bar dataKey="earned" stackId="mint" fill="#6366f1" name="Earned" radius={[4, 4, 0, 0]} />
+                                                    <Bar dataKey="grant" stackId="mint" fill="#a78bfa" name="Grant" radius={[4, 4, 0, 0]} />
+                                                    <Bar dataKey="spend" fill="#f87171" name="Spend" radius={[4, 4, 0, 0]} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* Breakdowns row */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                                    {/* Spend by service */}
+                                    <div className="bg-canvas border border-borderSubtle rounded-2xl overflow-hidden">
+                                        <div className="px-4 py-3 border-b border-borderSubtle">
+                                            <div className="text-sm font-bold text-ink">Spend by Service</div>
+                                            <div className="text-xs text-inkLight">{dapEconomy?.summary?.spends?.total_credits?.toLocaleString() ?? '0'} credits total</div>
+                                        </div>
+                                        <div className="divide-y divide-borderSubtle">
+                                            {(dapEconomy?.summary?.spends?.by_service ?? []).length === 0
+                                                ? <div className="px-4 py-4 text-xs text-inkLight">No data for this period</div>
+                                                : (dapEconomy.summary.spends.by_service as any[]).map((row: any) => (
+                                                    <div key={row.value} className="flex items-center justify-between px-4 py-2 text-sm">
+                                                        <span className="text-ink font-mono text-xs">{row.value}</span>
+                                                        <span className="text-inkLight font-bold">{row.count?.toLocaleString()}</span>
+                                                    </div>
+                                                ))
+                                            }
+                                        </div>
+                                    </div>
+
+                                    {/* Earn by reason */}
+                                    <div className="bg-canvas border border-borderSubtle rounded-2xl overflow-hidden">
+                                        <div className="px-4 py-3 border-b border-borderSubtle">
+                                            <div className="text-sm font-bold text-ink">Earn by Reason</div>
+                                            <div className="text-xs text-inkLight">{dapEconomy?.summary?.earned?.total_credits?.toLocaleString() ?? '0'} credits total</div>
+                                        </div>
+                                        <div className="divide-y divide-borderSubtle">
+                                            {(dapEconomy?.summary?.earned?.by_reason ?? []).length === 0
+                                                ? <div className="px-4 py-4 text-xs text-inkLight">No data for this period</div>
+                                                : (dapEconomy.summary.earned.by_reason as any[]).map((row: any) => (
+                                                    <div key={row.value} className="flex items-center justify-between px-4 py-2 text-sm">
+                                                        <span className="text-ink font-mono text-xs">{row.value}</span>
+                                                        <span className="text-inkLight font-bold">{row.count?.toLocaleString()}</span>
+                                                    </div>
+                                                ))
+                                            }
+                                        </div>
+                                    </div>
+
+                                    {/* Tier distribution */}
+                                    <div className="bg-canvas border border-borderSubtle rounded-2xl overflow-hidden">
+                                        <div className="px-4 py-3 border-b border-borderSubtle">
+                                            <div className="text-sm font-bold text-ink">Tier Distribution</div>
+                                            <div className="text-xs text-inkLight">users reaching each tier</div>
+                                        </div>
+                                        <div className="divide-y divide-borderSubtle">
+                                            {(dapEconomy?.tiers ?? []).length === 0
+                                                ? <div className="px-4 py-4 text-xs text-inkLight">No tier data yet</div>
+                                                : (dapEconomy.tiers as any[]).map((row: any) => (
+                                                    <div key={row.metadata__tier} className="flex items-center justify-between px-4 py-2 text-sm">
+                                                        <span className="text-ink capitalize">{row.metadata__tier ?? 'unknown'}</span>
+                                                        <span className="text-inkLight font-bold">{row.count?.toLocaleString()}</span>
+                                                    </div>
+                                                ))
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── Config Panel ──────────────────────────────── */}
+                            <div className="space-y-5">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-lg font-black text-ink">DAP Credit Configuration</h2>
+                                        {dapConfig && (
+                                            <p className="text-xs text-inkLight mt-0.5">
+                                                Last updated {dapConfig.updated_at ? new Date(dapConfig.updated_at).toLocaleString() : '—'}
+                                                {dapConfig.updated_by ? ` by ${dapConfig.updated_by}` : ''}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <button
+                                        onClick={handleSaveDAPConfig}
+                                        disabled={dapConfigSaving || dapConfigLoading || Object.keys(dapConfigForm).length === 0}
+                                        className="px-5 py-2 bg-gold text-canvas text-sm font-black rounded-xl hover:bg-gold/90 transition-colors disabled:opacity-50"
+                                    >
+                                        {dapConfigSaving ? 'Saving…' : 'Save Config'}
+                                    </button>
+                                </div>
+
+                                {dapConfigLoading ? (
+                                    <div className="p-8 text-center text-inkLight text-sm">Loading config…</div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                                        {/* Rewards */}
+                                        <div className="bg-canvas border border-borderSubtle rounded-2xl p-5 space-y-4">
+                                            <h3 className="text-sm font-bold text-ink">Reward Amounts <span className="text-inkLight font-normal">(credits)</span></h3>
+                                            {[
+                                                { key: 'reward_wallet_signup', label: 'Wallet Signup' },
+                                                { key: 'reward_creator_upgrade', label: 'Creator Upgrade' },
+                                                { key: 'reward_follow_peacelovemusic', label: 'Follow PeaceLoveMusic' },
+                                            ].map(({ key, label }) => (
+                                                <div key={key} className="space-y-1">
+                                                    <label className="text-xs font-bold text-inkLight">{label}</label>
+                                                    <input
+                                                        type="number"
+                                                        value={dapConfigForm[key] ?? ''}
+                                                        onChange={e => setDapConfigForm(f => ({ ...f, [key]: Number(e.target.value) }))}
+                                                        className="w-full bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Service Pricing */}
+                                        <div className="bg-canvas border border-borderSubtle rounded-2xl p-5 space-y-4">
+                                            <h3 className="text-sm font-bold text-ink">Service Pricing <span className="text-inkLight font-normal">(credits per use)</span></h3>
+                                            {[
+                                                { key: 'price_playout_upload', label: 'Playout Upload' },
+                                                { key: 'price_content_generation', label: 'Content Generation' },
+                                            ].map(({ key, label }) => (
+                                                <div key={key} className="space-y-1">
+                                                    <label className="text-xs font-bold text-inkLight">{label}</label>
+                                                    <input
+                                                        type="number"
+                                                        value={dapConfigForm[key] ?? ''}
+                                                        onChange={e => setDapConfigForm(f => ({ ...f, [key]: Number(e.target.value) }))}
+                                                        className="w-full bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Tier Thresholds */}
+                                        <div className="bg-canvas border border-borderSubtle rounded-2xl p-5 space-y-4">
+                                            <h3 className="text-sm font-bold text-ink">Tier Thresholds <span className="text-inkLight font-normal">(cumulative credits)</span></h3>
+                                            {[
+                                                { key: 'tier_starter', label: 'Starter' },
+                                                { key: 'tier_active', label: 'Active' },
+                                                { key: 'tier_power', label: 'Power' },
+                                                { key: 'tier_whale', label: 'Whale' },
+                                            ].map(({ key, label }) => (
+                                                <div key={key} className="space-y-1">
+                                                    <label className="text-xs font-bold text-inkLight">{label}</label>
+                                                    <input
+                                                        type="number"
+                                                        value={dapConfigForm[key] ?? ''}
+                                                        onChange={e => setDapConfigForm(f => ({ ...f, [key]: Number(e.target.value) }))}
+                                                        className="w-full bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Exchange Rate */}
+                                        <div className="bg-canvas border border-borderSubtle rounded-2xl p-5 space-y-4">
+                                            <h3 className="text-sm font-bold text-ink">Exchange Rate</h3>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-bold text-inkLight">STX → Credits Rate</label>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={dapConfigForm.stx_to_credits_rate ?? ''}
+                                                    onChange={e => setDapConfigForm(f => ({ ...f, stx_to_credits_rate: e.target.value }))}
+                                                    className="w-full bg-surface border border-borderSubtle rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-gold/60"
+                                                />
+                                                <p className="text-xs text-inkLight">Credits received per 1 STX deposited</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     )}
                     {ltSubView === 'reports' && (
                         <div className="p-8 text-inkLight">Reports — coming soon</div>
