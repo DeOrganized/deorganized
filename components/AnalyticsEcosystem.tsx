@@ -519,7 +519,7 @@ export const AnalyticsEcosystem: React.FC = () => {
             const [statsRes, pageviewsRes, pagesRes, referrersRes, countriesRes, devicesRes, browsersRes] = await Promise.all([
                 fetchUmamiStats(period),
                 fetchUmamiPageviews(period),
-                fetchUmamiMetrics(period, 'url'),
+                fetchUmamiMetrics(period, 'path'),
                 fetchUmamiMetrics(period, 'referrer'),
                 fetchUmamiMetrics(period, 'country'),
                 fetchUmamiMetrics(period, 'device'),
