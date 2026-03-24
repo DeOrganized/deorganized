@@ -2,20 +2,24 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Loader2, Globe, Twitter, Users, Heart,
     Image as ImageIcon, X, MessageSquare,
-    Calendar, ShoppingBag, Tv, Send,
+    Calendar, ShoppingBag, Tv, Send, Zap, Activity,
 } from 'lucide-react';
 import {
     Community, Membership, MembershipRole, Show, Event, Merch,
+    FeedEvent,
     getCommunity, getCommunityFeed, getCommunityShows, getCommunityEvents,
     getCommunityMerch, getCommunityMembers, toggleCommunityFollow,
+    getCommunityFeedEvents,
     createPost, getImageUrl,
 } from '../../lib/api';
 import { useAuth } from '../../lib/AuthContext';
 import { CommunityNav } from './CommunityNav';
 import { JoinButton } from './JoinButton';
 import { CommunityMembers } from './CommunityMembers';
+import { GovernancePanel } from './GovernancePanel';
+import { CreditsWidget } from './CreditsWidget';
 
-type CommunityTab = 'feed' | 'shows' | 'events' | 'merch' | 'members';
+type CommunityTab = 'feed' | 'shows' | 'events' | 'merch' | 'members' | 'activity' | 'governance';
 
 interface Props {
     slug: string;
@@ -413,6 +417,7 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
     const [events, setEvents] = useState<Event[]>([]);
     const [merch, setMerch] = useState<Merch[]>([]);
     const [members, setMembers] = useState<Membership[]>([]);
+    const [activityEvents, setActivityEvents] = useState<FeedEvent[]>([]);
     const [tabLoading, setTabLoading] = useState(false);
 
     // Load community on mount
@@ -450,6 +455,11 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
                 getCommunityMerch(community.slug, token).then((d) => setMerch(d.results ?? d)),
             members: () =>
                 getCommunityMembers(community.slug, token).then(setMembers),
+            activity: () =>
+                getCommunityFeedEvents(community.slug, token).then((d) =>
+                    setActivityEvents(d.results ?? [])
+                ),
+            governance: () => Promise.resolve(), // GovernancePanel fetches its own data
         };
 
         loaders[activeTab]().catch(console.error).finally(() => setTabLoading(false));
@@ -637,10 +647,34 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
                     showManage={canManage}
                     onManage={() => onNavigate('community-manage', community.slug)}
                 />
+                {/* Extra NOS tabs */}
+                <div className="flex gap-1 mt-1">
+                    {(['activity', 'governance'] as const).map((tab) => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors capitalize flex items-center gap-1 ${
+                                activeTab === tab
+                                    ? 'bg-gold text-black'
+                                    : 'text-inkLight hover:text-ink'
+                            }`}
+                        >
+                            {tab === 'activity' ? <Activity className="w-3 h-3" /> : <Zap className="w-3 h-3" />}
+                            {tab}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* ── Tab content ── */}
             <div className="px-4 sm:px-6 py-6">
+                {/* CreditsWidget for authenticated members */}
+                {isBackendAuthenticated && isMember && (
+                    <div className="mb-6">
+                        <CreditsWidget />
+                    </div>
+                )}
+
                 {tabLoading ? (
                     <div className="flex justify-center py-16">
                         <Loader2 className="w-6 h-6 animate-spin text-gold" />
@@ -672,6 +706,49 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
                                 userRole={userRole}
                                 userMembershipId={membershipId}
                                 onMembersChanged={setMembers}
+                            />
+                        )}
+                        {activeTab === 'activity' && (
+                            <div className="space-y-3">
+                                {activityEvents.length === 0 ? (
+                                    <EmptyState
+                                        icon={<Activity className="w-7 h-7" />}
+                                        title="No activity yet"
+                                        subtitle="Community events, games, and rewards will appear here"
+                                    />
+                                ) : (
+                                    activityEvents.map((ev) => (
+                                        <div key={ev.id} className="bg-surface border border-borderSubtle rounded-2xl p-4 flex gap-3">
+                                            <div className="w-9 h-9 rounded-xl bg-gold/10 flex items-center justify-center shrink-0">
+                                                <Activity className="w-4 h-4 text-gold" />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-black text-ink">{ev.title}</p>
+                                                {ev.body && <p className="text-xs text-inkLight mt-0.5">{ev.body}</p>}
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    {ev.actor && (
+                                                        <span className="text-xs text-inkLight/60">{ev.actor.display_name}</span>
+                                                    )}
+                                                    <span className="text-[10px] text-inkLight/40">
+                                                        {new Date(ev.created_at).toLocaleDateString()}
+                                                    </span>
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                                        ev.source === 'nos' ? 'bg-purple-500/10 text-purple-400' : 'bg-canvas text-inkLight'
+                                                    }`}>
+                                                        {ev.source}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+                        {activeTab === 'governance' && (
+                            <GovernancePanel
+                                communitySlug={community.slug}
+                                isMember={isMember}
+                                userRole={userRole}
                             />
                         )}
                     </>

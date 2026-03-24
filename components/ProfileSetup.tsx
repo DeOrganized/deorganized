@@ -38,11 +38,46 @@ export const ProfileSetup: React.FC<ProfileSetupProps> = ({ onNavigate }) => {
         }
     }, [walletAddress, onNavigate]);
 
+    const validateForm = (): boolean => {
+        const errors: { [key: string]: string } = {};
+
+        // Username validation
+        if (formData.username) {
+            if (formData.username.length < 3) {
+                errors.username = 'Username must be at least 3 characters long.';
+            } else if (formData.username.length > 30) {
+                errors.username = 'Username must be 30 characters or fewer.';
+            } else if (!/^[a-z0-9_]+$/.test(formData.username)) {
+                const illegal: string[] = [];
+                if (/[A-Z]/.test(formData.username)) illegal.push('uppercase letters');
+                if (/\s/.test(formData.username)) illegal.push('spaces');
+                if (/\./.test(formData.username)) illegal.push('dots');
+                if (/[^a-z0-9_]/.test(formData.username)) illegal.push('special characters');
+                errors.username = `Username cannot contain ${illegal.join(', ')}. Use only lowercase letters, numbers, and underscores.`;
+            }
+        }
+
+        // Display name validation
+        if (formData.display_name && formData.display_name.length > 50) {
+            errors.display_name = 'Display name must be 50 characters or fewer.';
+        }
+
+        // Bio validation
+        if (formData.bio && formData.bio.length > 500) {
+            errors.bio = `Bio is too long (${formData.bio.length}/500 characters). Please shorten it.`;
+        }
+
+        setFieldErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value,
-        });
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+        // Clear the error for this field on each keystroke
+        if (fieldErrors[name]) {
+            setFieldErrors(prev => { const next = { ...prev }; delete next[name]; return next; });
+        }
     };
 
     const handleRoleSelect = (role: 'user' | 'creator') => {
@@ -51,10 +86,15 @@ export const ProfileSetup: React.FC<ProfileSetupProps> = ({ onNavigate }) => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setIsSubmitting(true);
         setSubmitError(null);
-        setFieldErrors({});
 
+        // Run client-side validation first — stops submission with clear inline feedback
+        if (!validateForm()) {
+            setSubmitError('Please fix the issues highlighted below before continuing.');
+            return;
+        }
+
+        setIsSubmitting(true);
         try {
             console.log('Submitting setup form:', formData);
 
@@ -230,22 +270,35 @@ export const ProfileSetup: React.FC<ProfileSetupProps> = ({ onNavigate }) => {
                                 value={formData.display_name}
                                 onChange={handleInputChange}
                                 placeholder="e.g. John Doe"
-                                className="w-full pl-12 pr-4 py-3 bg-surface border border-borderSubtle rounded-xl text-ink placeholder:text-inkLight/50 focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 transition-all"
+                                maxLength={50}
+                                className={`w-full pl-12 pr-4 py-3 bg-surface border rounded-xl text-ink placeholder:text-inkLight/50 focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 transition-all ${fieldErrors.display_name ? 'border-red-500' : 'border-borderSubtle'}`}
                             />
                         </div>
+                        {fieldErrors.display_name && (
+                            <p className="text-red-500 text-sm mt-1 font-medium">{fieldErrors.display_name}</p>
+                        )}
                     </div>
 
                     {/* Bio */}
                     <div className="mb-6">
-                        <label className="block text-sm font-bold text-ink mb-2">Bio</label>
+                        <label className="block text-sm font-bold text-ink mb-2 flex items-center justify-between">
+                            <span>Bio</span>
+                            <span className={`text-xs font-normal ${formData.bio.length > 450 ? (formData.bio.length > 500 ? 'text-red-500' : 'text-amber-500') : 'text-inkLight'}`}>
+                                {formData.bio.length}/500
+                            </span>
+                        </label>
                         <textarea
                             name="bio"
                             value={formData.bio}
                             onChange={handleInputChange}
                             rows={4}
+                            maxLength={520}
                             placeholder="Tell us about yourself..."
-                            className="w-full px-4 py-3 bg-surface border border-borderSubtle rounded-xl text-ink placeholder:text-inkLight/50 focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 transition-all resize-none"
+                            className={`w-full px-4 py-3 bg-surface border rounded-xl text-ink placeholder:text-inkLight/50 focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 transition-all resize-none ${fieldErrors.bio ? 'border-red-500' : 'border-borderSubtle'}`}
                         />
+                        {fieldErrors.bio && (
+                            <p className="text-red-500 text-sm mt-1 font-medium">{fieldErrors.bio}</p>
+                        )}
                     </div>
 
                     {/* Website */}

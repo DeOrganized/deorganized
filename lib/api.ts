@@ -58,7 +58,8 @@ export interface Show {
 
 export interface Notification {
     id: number;
-    notification_type: 'follow' | 'like' | 'comment' | 'share' | 'show_reminder' | 'show_cancelled' | 'guest_request' | 'guest_accepted' | 'guest_declined' | 'co_host_added';
+    notification_type: 'follow' | 'like' | 'comment' | 'share' | 'show_reminder' | 'show_cancelled' | 'guest_request' | 'guest_accepted' | 'guest_declined' | 'co_host_added' | 'co_host_invited' | 'co_host_accepted_self' | 'co_host_declined_self' | string;
+    text?: string;
     message?: string;
     is_read: boolean;
     read?: boolean;
@@ -1980,21 +1981,23 @@ export const fetchCreatorStats = async (creatorId: number, accessToken?: string)
     }
 };
 
-// --- Messaging & Threads ---
+// // --- Messaging & Threads ---
 
 export interface Thread {
     id: number;
     participants: {
         id: number;
         username: string;
-        profile_picture?: string;
+        profile_picture: string | null;
     }[];
     created_at: string;
     is_paygated: boolean;
-    price_stx: string;
-    price_usdcx: string;
-    last_message?: Message;
-    last_message_at?: string;
+    last_message: {
+        id: number;
+        sender: { id: number; username: string; };
+        body: string;
+        sent_at: string;
+    } | null;
     unread_count: number;
 }
 
@@ -2004,56 +2007,56 @@ export interface Message {
     sender: {
         id: number;
         username: string;
-        profile_picture?: string;
+        profile_picture: string | null;
     };
-    body: string;
-    sent_at: string;
+    body: string;      // serializer alias for Message.text
+    sent_at: string;   // serializer alias for Message.created_at
+    is_read: boolean;
+    cohost_invite_id?: number; // client-side enrichment only
 }
 
 export const fetchThreads = async (accessToken: string): Promise<Thread[]> => {
-    try {
-        const { response } = await x402Fetch(`${API_BASE_URL}/messages/threads/`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        if (!response.ok) throw new Error('Failed to fetch threads');
-        const data = await response.json();
-        return data.results || data;
-    } catch (error) {
-        console.error('Error fetching threads:', error);
-        throw error;
-    }
+    const res = await fetch(`${API_BASE_URL}/messages/threads/`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch threads');
+    const data = await res.json();
+    return data.results ?? data;
 };
 
 export const fetchMessages = async (threadId: number, accessToken: string): Promise<Message[]> => {
-    try {
-        const { response } = await x402Fetch(`${API_BASE_URL}/messages/threads/${threadId}/messages/`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        if (!response.ok) throw new Error('Failed to fetch messages');
-        const data = await response.json();
-        return data.results || data;
-    } catch (error) {
-        console.error('Error fetching messages:', error);
-        throw error;
-    }
+    const res = await fetch(`${API_BASE_URL}/messages/threads/${threadId}/messages/`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch messages');
+    const data = await res.json();
+    return data.results ?? data;
 };
 
-export const sendMessage = async (threadId: number, body: string, accessToken: string): Promise<Message> => {
-    try {
-        const response = await fetch(`${API_BASE_URL}/messages/threads/${threadId}/messages/`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ body })
-        });
-        if (!response.ok) throw new Error('Failed to send message');
-        return await response.json();
-    } catch (error) {
-        console.error('Error sending message:', error);
-        throw error;
-    }
+export const sendMessage = async (threadId: number, text: string, accessToken: string): Promise<Message> => {
+    const res = await fetch(`${API_BASE_URL}/messages/threads/${threadId}/messages/`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ body: text }),
+    });
+    if (!res.ok) throw new Error('Failed to send message');
+    return res.json();
+};
+
+export const startThread = async (recipientId: number, accessToken: string): Promise<Thread> => {
+    const res = await fetch(`${API_BASE_URL}/messages/threads/`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ recipient_id: recipientId }),
+    });
+    if (!res.ok) throw new Error('Failed to start thread');
+    return res.json();
 };
 
 // --- Merch & Orders (Added back) ---
@@ -3350,3 +3353,217 @@ export const getCommunityFollowers = async (slug: string, accessToken?: string) 
     if (!res.ok) throw new Error('Failed to fetch community followers');
     return res.json();
 };
+
+// ═══════════════════════════════════════════════════════════
+//  NOS Credit System
+// ═══════════════════════════════════════════════════════════
+
+export interface CreditEvent {
+    id: number;
+    source: string;
+    action: string;
+    amount: number;
+    points: number;
+    created_at: string;
+    community?: string | null;
+}
+
+export interface CreditsBalance {
+    balance: number;
+    earned_total: number;
+    engagement_threshold_met: boolean;
+    engagement_threshold: number;
+    recent: CreditEvent[];
+}
+
+export const fetchCreditsBalance = async (accessToken: string): Promise<CreditsBalance> => {
+    const res = await fetch(`${API_BASE_URL}/users/credits/balance/`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch credits balance');
+    return res.json();
+};
+
+// ═══════════════════════════════════════════════════════════
+//  NOS Community Activity Feed Events
+// ═══════════════════════════════════════════════════════════
+
+export interface FeedEvent {
+    id: string;
+    event_type: string;
+    title: string;
+    body: string;
+    actor: { id: string; display_name: string; avatar_url: string | null } | null;
+    metadata: Record<string, any>;
+    source: 'django' | 'nos';
+    created_at: string;
+}
+
+export const getCommunityFeedEvents = async (
+    slug: string,
+    accessToken?: string
+): Promise<{ results: FeedEvent[] }> => {
+    const headers: HeadersInit = {};
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const res = await fetch(`${API_BASE_URL}/communities/${slug}/feed-events/`, { headers });
+    if (!res.ok) throw new Error('Failed to fetch community feed events');
+    return res.json();
+};
+
+// ═══════════════════════════════════════════════════════════
+//  NOS Governance
+// ═══════════════════════════════════════════════════════════
+
+export interface Proposal {
+    id: string;
+    title: string;
+    description: string;
+    proposal_type: string;
+    status: 'draft' | 'active' | 'passed' | 'rejected' | 'executed';
+    voting_starts_at: string;
+    voting_ends_at: string;
+    execute_after: string | null;
+    votes_for: number;
+    votes_against: number;
+    quorum_required: number;
+    approval_threshold: string;
+    created_by: { id: string; display_name: string } | null;
+    created_at: string;
+}
+
+export const fetchProposals = async (
+    communitySlug: string,
+    accessToken?: string
+): Promise<{ results: Proposal[] }> => {
+    const headers: HeadersInit = {};
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const res = await fetch(`${API_BASE_URL}/communities/${communitySlug}/proposals/`, { headers });
+    if (!res.ok) throw new Error('Failed to fetch proposals');
+    return res.json();
+};
+
+export const createProposal = async (
+    communitySlug: string,
+    payload: {
+        title: string;
+        description: string;
+        proposal_type: string;
+        voting_starts_at: string;
+        voting_ends_at: string;
+        quorum_required?: number;
+        approval_threshold?: number;
+    },
+    accessToken: string
+): Promise<Proposal> => {
+    const res = await fetch(`${API_BASE_URL}/communities/${communitySlug}/proposals/`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Failed to create proposal');
+    }
+    return res.json();
+};
+
+export const castVote = async (
+    communitySlug: string,
+    proposalId: string,
+    choice: 'for' | 'against' | 'abstain',
+    accessToken: string
+): Promise<{ status: string; choice: string }> => {
+    const res = await fetch(
+        `${API_BASE_URL}/communities/${communitySlug}/proposals/${proposalId}/vote/`,
+        {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ choice }),
+        }
+    );
+    if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to cast vote');
+    }
+    return res.json();
+};
+
+export const activateCommunityModule = async (
+    communitySlug: string,
+    module: string,
+    accessToken: string
+): Promise<{ status: string; module: string }> => {
+    const res = await fetch(
+        `${API_BASE_URL}/communities/${communitySlug}/modules/${module}/activate/`,
+        {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+        }
+    );
+    if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to activate module');
+    }
+    return res.json();
+};
+// ═══════════════════════════════════════════════════════════
+//  Co-Host Invite API
+// ═══════════════════════════════════════════════════════════
+
+export interface CoHostInvite {
+    id: number;
+    show: {
+        id: number;
+        title: string;
+        slug: string;
+        thumbnail: string | null;
+        creator: { id: number; username: string; profile_picture: string | null };
+    };
+    inviter: { id: number; username: string; profile_picture: string | null };
+    invitee: { id: number; username: string; profile_picture: string | null };
+    status: 'pending' | 'accepted' | 'declined';
+    created_at: string;
+}
+
+export const fetchMyCoHostInvites = async (accessToken: string): Promise<CoHostInvite[]> => {
+    const res = await fetch(`${API_BASE_URL}/cohost-invites/`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.results ?? data;
+};
+
+export const respondToCoHostInvite = async (
+    inviteId: number,
+    action: 'accept' | 'decline',
+    accessToken: string
+): Promise<{ status: string }> => {
+    const res = await fetch(`${API_BASE_URL}/cohost-invites/${inviteId}/respond/`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ accept: action === 'accept' }),
+    });
+    if (!res.ok) throw new Error('Failed to respond to co-host invite');
+    return res.json();
+};
+
+export const markThreadRead = async (threadId: number, accessToken: string): Promise<void> => {
+    await fetch(`${API_BASE_URL}/messages/threads/${threadId}/mark_read/`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+    });
+};
+

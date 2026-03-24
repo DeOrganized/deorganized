@@ -24,9 +24,9 @@ import { CommunityPage } from './components/communities/CommunityPage';
 import { CommunitiesDiscovery } from './components/communities/CommunitiesDiscovery';
 import { CreateCommunity } from './components/communities/CreateCommunity';
 import { CommunityManage } from './components/communities/CommunityManage';
+import { MessagingPage } from './pages/MessagingPage';
 
-
-type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps' | 'communities' | 'community-page' | 'community-manage' | 'create-community';
+type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps' | 'communities' | 'community-page' | 'community-manage' | 'create-community' | 'messages';
 
 // Map URL paths to page views and extract IDs
 function parseUrl(pathname: string): { page: PageView; id: string | number | null } {
@@ -67,6 +67,8 @@ function parseUrl(pathname: string): { page: PageView; id: string | number | nul
       if (!param) return { page: 'communities', id: null };
       if (parts[2] === 'manage') return { page: 'community-manage', id: param };
       return { page: 'community-page', id: param };
+    case 'messages':
+      return { page: 'messages', id: null };
     default:
       return { page: 'home', id: null };
   }
@@ -94,6 +96,7 @@ function pageToUrl(page: PageView, id?: string | number | null): string {
     case 'community-page': return `/c/${id}`;
     case 'community-manage': return `/c/${id}/manage`;
     case 'create-community': return '/create-community';
+    case 'messages': return '/messages';
     case 'home':
     default: return '/';
   }
@@ -138,8 +141,19 @@ const AppContent: React.FC = () => {
     switch (currentView) {
       case 'user-profile':
         return <UserDashboard onNavigate={handleNavigate} />;
-      case 'dashboard':
+      case 'dashboard': {
+        // Only creators and staff can access the Studio
+        const isCreator = backendUser?.role === 'creator' || backendUser?.is_staff;
+        if (!isBackendAuthenticated) {
+          // Not logged in — bounce to home
+          return <Hero onNavigate={handleNavigate} />;
+        }
+        if (!isCreator) {
+          // Logged in but not a creator — show their profile instead
+          return <UserDashboard onNavigate={handleNavigate} />;
+        }
         return <CreatorDashboard onNavigate={handleNavigate} />;
+      }
 
       // Discovery Pages
       case 'shows':
@@ -178,6 +192,8 @@ const AppContent: React.FC = () => {
         return selectedId ? <CommunityManage onNavigate={handleNavigate} slug={String(selectedId)} /> : <div>Community not found</div>;
       case 'create-community':
         return <CreateCommunity onNavigate={handleNavigate} />;
+      case 'messages':
+        return <MessagingPage onNavigate={handleNavigate} />;
       case 'home':
       default:
         return <Hero onNavigate={handleNavigate} />;
