@@ -13,8 +13,11 @@ export const MatchupCard: React.FC<MatchupCardProps> = ({ matchup, coin, roundSt
   const marketLabel = MARKET_LABELS[matchup.market] || matchup.market;
 
   return (
-    <div
-      className="rounded-xl p-5 flex flex-col gap-4 border hover:opacity-90 transition-opacity"
+    <a
+      href={ctaUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="rounded-xl p-5 flex flex-col gap-4 border hover:opacity-90 transition-opacity cursor-pointer"
       style={{
         backgroundColor: coin.color + '12',
         borderColor: coin.color + '44',
@@ -65,11 +68,8 @@ export const MatchupCard: React.FC<MatchupCardProps> = ({ matchup, coin, roundSt
 
       {/* CTA */}
       {roundStatus !== 'resolved' && (
-        <a
-          href={ctaUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-mono font-bold transition-opacity hover:opacity-80"
+        <div
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-mono font-bold"
           style={{
             backgroundColor: coin.color + '22',
             color: coin.color,
@@ -77,9 +77,9 @@ export const MatchupCard: React.FC<MatchupCardProps> = ({ matchup, coin, roundSt
           }}
         >
           Trade Now <ExternalLink className="w-3.5 h-3.5" />
-        </a>
+        </div>
       )}
-    </div>
+    </a>
   );
 };
 
