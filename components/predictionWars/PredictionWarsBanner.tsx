@@ -12,13 +12,11 @@ export const PredictionWarsBanner: React.FC<PredictionWarsBannerProps> = ({ onNa
   const BANNER_BG = 'linear-gradient(90deg, #0c0a18 0%, #110e1f 50%, #0c0a18 100%)';
 
   return (
-    <div
-      role="link"
-      tabIndex={0}
-      className="relative overflow-hidden cursor-pointer select-none"
+    <a
+      href="/prediction-wars"
+      className="relative overflow-hidden cursor-pointer select-none block"
       style={{ background: BANNER_BG, borderBottom: '1px solid rgba(255,255,255,0.07)' }}
-      onClick={() => onNavigate('prediction-wars')}
-      onKeyDown={(e) => e.key === 'Enter' && onNavigate('prediction-wars')}
+      onClick={(e) => { e.preventDefault(); onNavigate('prediction-wars'); }}
     >
       {/* Edge fades */}
       <div className="absolute left-0 top-0 bottom-0 w-12 z-10 pointer-events-none"
@@ -81,6 +79,6 @@ export const PredictionWarsBanner: React.FC<PredictionWarsBannerProps> = ({ onNa
           100% { transform: translateX(-33.333%); }
         }
       `}</style>
-    </div>
+    </a>
   );
 };
