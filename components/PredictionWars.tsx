@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { ExternalLink, Swords, Trophy, TrendingUp, Users, Zap, Info } from 'lucide-react';
 import {
   predictionWarsData,
@@ -57,7 +56,6 @@ export const PredictionWars: React.FC<PredictionWarsProps> = ({ onNavigate, coin
 
   return (
     <>
-    <Helmet>
       <title>{pageTitle}</title>
       <meta property="og:title" content="Memecoin Prediction Wars — Season 1 Live" />
       <meta property="og:description" content={pageDesc} />
@@ -68,8 +66,7 @@ export const PredictionWars: React.FC<PredictionWarsProps> = ({ onNavigate, coin
       <meta name="twitter:title" content="Memecoin Prediction Wars — Season 1 Live" />
       <meta name="twitter:description" content={pageDesc} />
       <meta name="twitter:image" content={ogImage} />
-    </Helmet>
-    <div
+      <div
       className="min-h-screen bg-canvas"
       style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}
     >

@@ -10,7 +10,7 @@
  */
 
 export const config = {
-  matcher: '/prediction-wars/:path*',
+  matcher: ['/prediction-wars', '/prediction-wars/:path*'],
 };
 
 const OG_IMAGE = 'https://www.deorganized.com/images/prediction-wars/og-card.png';
