@@ -43,7 +43,7 @@ export const PredictionWars: React.FC<PredictionWarsProps> = ({ onNavigate, coin
     ? leaderboard.filter(e => e.memecoin === activeCoin.symbol)
     : leaderboard;
 
-  const ogImage = 'https://www.deorganized.com/images/prediction-wars/og-card.png';
+  const ogImage = 'https://www.deorganized.com/og-prediction-wars.png';
   const pageTitle = activeCoin
     ? `${activeCoin.symbol} — Prediction Wars | DeOrganized`
     : 'Prediction Wars | DeOrganized';

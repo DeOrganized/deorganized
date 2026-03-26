@@ -13,7 +13,7 @@ export const config = {
   matcher: ['/prediction-wars', '/prediction-wars/:path*'],
 };
 
-const OG_IMAGE = 'https://www.deorganized.com/images/prediction-wars/og-card.png';
+const OG_IMAGE = 'https://www.deorganized.com/og-prediction-wars.png';
 const SITE_URL = 'https://www.deorganized.com';
 const VALID_COINS = new Set(['leo', 'welsh', 'pepe', 'roo', 'flat', 'play']);
 
