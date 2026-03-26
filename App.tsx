@@ -24,9 +24,11 @@ import { CommunityPage } from './components/communities/CommunityPage';
 import { CommunitiesDiscovery } from './components/communities/CommunitiesDiscovery';
 import { CreateCommunity } from './components/communities/CreateCommunity';
 import { CommunityManage } from './components/communities/CommunityManage';
+import { PredictionWars } from './components/PredictionWars';
+import { PredictionWarsBanner } from './components/predictionWars/PredictionWarsBanner';
 
 
-type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps' | 'communities' | 'community-page' | 'community-manage' | 'create-community';
+type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps' | 'communities' | 'community-page' | 'community-manage' | 'create-community' | 'prediction-wars';
 
 // Map URL paths to page views and extract IDs
 function parseUrl(pathname: string): { page: PageView; id: string | number | null } {
@@ -67,6 +69,9 @@ function parseUrl(pathname: string): { page: PageView; id: string | number | nul
       if (!param) return { page: 'communities', id: null };
       if (parts[2] === 'manage') return { page: 'community-manage', id: param };
       return { page: 'community-page', id: param };
+    case 'prediction-wars':
+    case 'pw':
+      return { page: 'prediction-wars', id: param }; // param is the coin slug if present
     default:
       return { page: 'home', id: null };
   }
@@ -94,6 +99,7 @@ function pageToUrl(page: PageView, id?: string | number | null): string {
     case 'community-page': return `/c/${id}`;
     case 'community-manage': return `/c/${id}/manage`;
     case 'create-community': return '/create-community';
+    case 'prediction-wars': return id ? `/prediction-wars/${id}` : '/prediction-wars';
     case 'home':
     default: return '/';
   }
@@ -178,6 +184,8 @@ const AppContent: React.FC = () => {
         return selectedId ? <CommunityManage onNavigate={handleNavigate} slug={String(selectedId)} /> : <div>Community not found</div>;
       case 'create-community':
         return <CreateCommunity onNavigate={handleNavigate} />;
+      case 'prediction-wars':
+        return <PredictionWars onNavigate={handleNavigate} coin={selectedId ? String(selectedId) : undefined} />;
       case 'home':
       default:
         return <Hero onNavigate={handleNavigate} />;
@@ -188,6 +196,7 @@ const AppContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-canvas font-sans selection:bg-gold/20 selection:text-ink overflow-x-hidden text-ink">
       <Navbar onNavigate={handleNavigate} currentPage={currentView} />
+      {currentView === 'home' && <PredictionWarsBanner onNavigate={handleNavigate} />}
       <main>
         {renderContent()}
       </main>

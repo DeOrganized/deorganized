@@ -1,0 +1,454 @@
+import React, { useEffect } from 'react';
+import { ExternalLink, Swords, Trophy, TrendingUp, Users, Zap, Info } from 'lucide-react';
+import {
+  predictionWarsData,
+  getCoinData,
+  STACKSMARKET_HOME,
+  MARKET_LABELS,
+  VALID_COIN_SLUGS,
+  Memecoin,
+  Matchup,
+} from '../data/predictionWars';
+import { MatchupCard } from './predictionWars/MatchupCard';
+import { LeaderboardTable } from './predictionWars/LeaderboardTable';
+import { CoinChip } from './predictionWars/CoinChip';
+import { TierBadge } from './predictionWars/TierBadge';
+import { RoundTimeline } from './predictionWars/RoundTimeline';
+
+interface PredictionWarsProps {
+  onNavigate: (page: string, id?: string) => void;
+  coin?: string; // lowercase coin slug from URL (e.g. 'leo')
+}
+
+export const PredictionWars: React.FC<PredictionWarsProps> = ({ onNavigate, coin }) => {
+  const { memecoins, rounds, leaderboard, currentRound, season } = predictionWarsData;
+
+  // Validate coin param — redirect to main page if slug is unknown
+  useEffect(() => {
+    if (coin && !VALID_COIN_SLUGS.includes(coin.toLowerCase())) {
+      onNavigate('prediction-wars');
+    }
+  }, [coin, onNavigate]);
+
+  const activeCoin: Memecoin | undefined = coin
+    ? getCoinData(coin.toLowerCase())
+    : undefined;
+
+  const currentRoundData = rounds.find(r => r.number === currentRound);
+  const displayMatchups: Matchup[] = activeCoin
+    ? (currentRoundData?.matchups.filter(m => m.memecoin === activeCoin.symbol) ?? [])
+    : (currentRoundData?.matchups ?? []);
+  const roundStatus = currentRoundData?.status ?? 'upcoming';
+
+  const leaderboardEntries = activeCoin
+    ? leaderboard.filter(e => e.memecoin === activeCoin.symbol)
+    : leaderboard;
+
+  return (
+    <div
+      className="min-h-screen"
+      style={{
+        background: '#08070f',
+        fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+      }}
+    >
+      {/* ── HERO ──────────────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden pt-24 pb-16 px-4">
+        {/* Grid background */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-[0.06]"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px)',
+            backgroundSize: '48px 48px',
+          }}
+        />
+        {/* Gradient glow */}
+        <div
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none"
+          style={{
+            background: activeCoin
+              ? `radial-gradient(ellipse at 50% 0%, ${activeCoin.color}18 0%, transparent 70%)`
+              : 'radial-gradient(ellipse at 50% 0%, rgba(139,92,246,0.12) 0%, transparent 70%)',
+          }}
+        />
+
+        <div className="relative max-w-5xl mx-auto text-center">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/10 text-white/50 text-xs font-mono mb-8"
+            style={{ background: 'rgba(255,255,255,0.04)' }}
+          >
+            <Swords className="w-3.5 h-3.5" />
+            SEASON {season} · ROUND {currentRound} LIVE
+          </div>
+
+          {/* Title */}
+          <h1
+            className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white mb-4 tracking-tight leading-none"
+            style={{ fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif" }}
+          >
+            {activeCoin ? (
+              <>
+                <span style={{ color: activeCoin.color }}>{activeCoin.symbol}</span>
+                {' '}in Prediction Wars
+              </>
+            ) : (
+              <>
+                Memecoin{' '}
+                <span
+                  style={{
+                    background: 'linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
+                  Prediction Wars
+                </span>
+              </>
+            )}
+          </h1>
+
+          {/* Tagline */}
+          <p className="text-white/50 text-lg max-w-xl mx-auto mb-10 leading-relaxed">
+            {activeCoin
+              ? `Follow ${activeCoin.symbol}'s performance in the live prediction league on StacksMarket.`
+              : 'Six memecoins. Six real markets. One winner. Pick your side and trade the outcome on StacksMarket.'}
+          </p>
+
+          {/* Coin chips (all coins, or just active) */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-10">
+            {memecoins.map(c => (
+              <button
+                key={c.symbol}
+                onClick={() =>
+                  activeCoin?.symbol === c.symbol
+                    ? onNavigate('prediction-wars')
+                    : onNavigate('prediction-wars', c.symbol.toLowerCase())
+                }
+                className="transition-transform hover:scale-105 focus:outline-none"
+              >
+                <CoinChip
+                  coin={c}
+                  size={activeCoin?.symbol === c.symbol ? 'lg' : 'md'}
+                />
+              </button>
+            ))}
+          </div>
+
+          {/* Primary CTA */}
+          <a
+            href={STACKSMARKET_HOME}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl font-mono font-bold text-sm transition-opacity hover:opacity-90"
+            style={{
+              background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
+              color: '#fff',
+              boxShadow: '0 4px 24px rgba(124,58,237,0.35)',
+            }}
+          >
+            Trade on StacksMarket <ExternalLink className="w-4 h-4" />
+          </a>
+        </div>
+      </section>
+
+      {/* ── CURRENT ROUND MATCHUPS ────────────────────────────────────── */}
+      <section className="max-w-5xl mx-auto px-4 pb-16">
+        <SectionHeader
+          icon={<Zap className="w-4 h-4" />}
+          label={`Round ${currentRound} — ${roundStatus === 'live' ? 'Live Now' : roundStatus === 'resolved' ? 'Resolved' : 'Upcoming'}`}
+          accent={roundStatus === 'live' ? '#34d399' : undefined}
+        />
+        {displayMatchups.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+            {displayMatchups.map(matchup => {
+              const coinData = getCoinData(matchup.memecoin);
+              if (!coinData) return null;
+              return (
+                <MatchupCard
+                  key={matchup.memecoin}
+                  matchup={matchup}
+                  coin={coinData}
+                  roundStatus={roundStatus}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-6 rounded-xl border border-white/10 p-10 text-center"
+            style={{ background: 'rgba(255,255,255,0.03)' }}
+          >
+            <p className="text-white/40 font-mono text-sm">No matchups scheduled yet</p>
+          </div>
+        )}
+      </section>
+
+      {/* ── LEADERBOARD ──────────────────────────────────────────────── */}
+      <section className="max-w-5xl mx-auto px-4 pb-16">
+        <SectionHeader icon={<Trophy className="w-4 h-4" />} label="Season Leaderboard" />
+        <div className="mt-6">
+          <LeaderboardTable entries={leaderboardEntries} memecoins={memecoins} />
+        </div>
+      </section>
+
+      {/* ── HOW IT WORKS ─────────────────────────────────────────────── */}
+      {!activeCoin && (
+        <section
+          className="py-16 px-4 border-t border-white/5"
+          style={{ background: 'rgba(255,255,255,0.02)' }}
+        >
+          <div className="max-w-5xl mx-auto">
+            <SectionHeader icon={<Info className="w-4 h-4" />} label="How It Works" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+              {HOW_IT_WORKS.map((step, i) => (
+                <div key={i} className="rounded-xl p-5 border border-white/8"
+                  style={{ background: 'rgba(255,255,255,0.03)' }}
+                >
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-4 font-mono font-bold text-sm"
+                    style={{ background: 'rgba(124,58,237,0.2)', color: '#a78bfa' }}
+                  >
+                    {i + 1}
+                  </div>
+                  <h3 className="font-bold text-white text-sm mb-2"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}
+                  >
+                    {step.title}
+                  </h3>
+                  <p className="text-white/45 text-xs leading-relaxed">{step.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── SCORING + REWARDS + TIERS ─────────────────────────────────── */}
+      {!activeCoin && (
+        <section className="max-w-5xl mx-auto px-4 py-16">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            {/* Scoring breakdown 60/20/20 */}
+            <div className="rounded-xl p-6 border border-white/10"
+              style={{ background: 'rgba(255,255,255,0.03)' }}
+            >
+              <h3 className="font-bold text-white text-sm mb-4 flex items-center gap-2"
+                style={{ fontFamily: "'Outfit', sans-serif" }}
+              >
+                <TrendingUp className="w-4 h-4 text-purple-400" /> Scoring
+              </h3>
+              <div className="flex flex-col gap-3">
+                {SCORING.map(s => (
+                  <div key={s.label} className="flex items-center justify-between">
+                    <span className="text-white/55 text-xs">{s.label}</span>
+                    <span className="font-mono font-bold text-sm" style={{ color: s.color }}>
+                      {s.pct}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {/* Bar */}
+              <div className="flex rounded-full overflow-hidden mt-4 h-2">
+                <div className="h-full" style={{ width: '60%', background: '#7c3aed' }} />
+                <div className="h-full" style={{ width: '20%', background: '#0ea5e9' }} />
+                <div className="h-full" style={{ width: '20%', background: '#f59e0b' }} />
+              </div>
+            </div>
+
+            {/* Rewards 70/30 */}
+            <div className="rounded-xl p-6 border border-white/10"
+              style={{ background: 'rgba(255,255,255,0.03)' }}
+            >
+              <h3 className="font-bold text-white text-sm mb-4 flex items-center gap-2"
+                style={{ fontFamily: "'Outfit', sans-serif" }}
+              >
+                <Trophy className="w-4 h-4 text-yellow-400" /> Rewards Split
+              </h3>
+              <div className="flex flex-col gap-3">
+                {REWARDS.map(r => (
+                  <div key={r.label} className="flex items-center justify-between">
+                    <span className="text-white/55 text-xs">{r.label}</span>
+                    <span className="font-mono font-bold text-sm" style={{ color: r.color }}>
+                      {r.pct}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex rounded-full overflow-hidden mt-4 h-2">
+                <div className="h-full" style={{ width: '70%', background: '#f59e0b' }} />
+                <div className="h-full" style={{ width: '30%', background: '#6b7280' }} />
+              </div>
+            </div>
+
+            {/* Performance Tiers */}
+            <div className="rounded-xl p-6 border border-white/10"
+              style={{ background: 'rgba(255,255,255,0.03)' }}
+            >
+              <h3 className="font-bold text-white text-sm mb-4 flex items-center gap-2"
+                style={{ fontFamily: "'Outfit', sans-serif" }}
+              >
+                <Users className="w-4 h-4 text-emerald-400" /> Weekly Tiers
+              </h3>
+              <div className="flex flex-col gap-3">
+                {TIERS.map(t => (
+                  <div key={t.label} className="flex items-center justify-between">
+                    <TierBadge tier={t.tier} />
+                    <span className="text-white/45 text-xs font-mono">{t.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── SCHEDULE + ALL COINS GRID ─────────────────────────────────── */}
+      {!activeCoin && (
+        <section
+          className="py-16 px-4 border-t border-white/5"
+          style={{ background: 'rgba(255,255,255,0.02)' }}
+        >
+          <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12">
+            {/* Timeline */}
+            <div>
+              <SectionHeader icon={<Swords className="w-4 h-4" />} label="Season Schedule" />
+              <div className="mt-6">
+                <RoundTimeline rounds={rounds} currentRound={currentRound} />
+              </div>
+            </div>
+
+            {/* All coins with CTA */}
+            <div>
+              <SectionHeader icon={<TrendingUp className="w-4 h-4" />} label="The Competitors" />
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                {memecoins.map(c => {
+                  const matchup = currentRoundData?.matchups.find(m => m.memecoin === c.symbol);
+                  const ctaUrl = matchup?.trackedUrl || matchup?.pollUrl || STACKSMARKET_HOME;
+                  return (
+                    <a
+                      key={c.symbol}
+                      href={ctaUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 rounded-xl p-3 border border-white/8 hover:border-white/15 transition-colors group"
+                      style={{ background: 'rgba(255,255,255,0.03)' }}
+                    >
+                      <img
+                        src={c.iconUrl}
+                        alt={c.symbol}
+                        width={32}
+                        height={32}
+                        className="rounded-full object-cover flex-shrink-0"
+                        style={{ border: `2px solid ${c.color}44` }}
+                        onError={(e) => { (e.target as HTMLImageElement).src = c.iconUrlOriginal; }}
+                      />
+                      <div className="min-w-0">
+                        <div className="font-mono font-bold text-sm" style={{ color: c.color }}>
+                          {c.symbol}
+                        </div>
+                        {matchup && (
+                          <div className="text-white/30 text-xs font-mono">
+                            vs {MARKET_LABELS[matchup.market] || matchup.market}
+                          </div>
+                        )}
+                      </div>
+                      <ExternalLink className="w-3.5 h-3.5 text-white/20 group-hover:text-white/40 ml-auto flex-shrink-0 transition-colors" />
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── BOTTOM CTA ───────────────────────────────────────────────── */}
+      <section className="py-20 px-4">
+        <div className="max-w-2xl mx-auto text-center">
+          <h2
+            className="text-3xl sm:text-4xl font-extrabold text-white mb-4 tracking-tight"
+            style={{ fontFamily: "'Outfit', sans-serif" }}
+          >
+            Ready to trade the outcome?
+          </h2>
+          <p className="text-white/45 mb-8 leading-relaxed">
+            Pick a market, back your memecoin, and put STX on the line. Rounds resolve every 48 hours.
+          </p>
+          <a
+            href={STACKSMARKET_HOME}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-mono font-bold transition-opacity hover:opacity-90"
+            style={{
+              background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
+              color: '#fff',
+              boxShadow: '0 4px 32px rgba(124,58,237,0.4)',
+            }}
+          >
+            Trade on StacksMarket <ExternalLink className="w-4 h-4" />
+          </a>
+          <p className="text-white/20 text-xs mt-6 font-mono">
+            DeOrganized is the broadcast partner for Prediction Wars Season 1.
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+};
+
+/* ── helpers ──────────────────────────────────────────────────────────── */
+
+const SectionHeader: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  accent?: string;
+}> = ({ icon, label, accent }) => (
+  <div className="flex items-center gap-2">
+    <span style={{ color: accent ?? 'rgba(255,255,255,0.35)' }}>{icon}</span>
+    <span
+      className="text-xs font-mono font-bold uppercase tracking-widest"
+      style={{ color: accent ?? 'rgba(255,255,255,0.35)' }}
+    >
+      {label}
+    </span>
+    <div className="flex-1 h-px bg-white/5 ml-2" />
+  </div>
+);
+
+/* ── static data ──────────────────────────────────────────────────────── */
+
+const HOW_IT_WORKS = [
+  {
+    title: 'Six memecoins compete',
+    body: 'LEO, WELSH, SAI, ROO, FLAT, and PLAY are each paired with a real-world market every round.',
+  },
+  {
+    title: 'Predict the outcome',
+    body: 'Will Bitcoin finish higher or lower? Trade the prediction on StacksMarket using STX.',
+  },
+  {
+    title: 'Volume drives standings',
+    body: 'Each coin\'s STX trading volume, unique wallets, and social engagement determine its weekly score.',
+  },
+  {
+    title: 'Top coins earn rewards',
+    body: 'At the end of each week, top performers earn a share of the prize pool. Bottom performers risk elimination.',
+  },
+];
+
+const SCORING = [
+  { label: 'Trading Volume', pct: 60, color: '#a78bfa' },
+  { label: 'Unique Wallets', pct: 20, color: '#38bdf8' },
+  { label: 'Social Engagement', pct: 20, color: '#fbbf24' },
+];
+
+const REWARDS = [
+  { label: 'Traders (winners)', pct: 70, color: '#fbbf24' },
+  { label: 'Platform / fees', pct: 30, color: '#6b7280' },
+];
+
+const TIERS = [
+  { tier: 'top' as const, label: 'TOP', desc: '≥ 5,000 STX/wk' },
+  { tier: 'mid' as const, label: 'MID', desc: '2,000–5,000 STX' },
+  { tier: 'at-risk' as const, label: 'AT RISK', desc: '< 2,000 STX' },
+];
