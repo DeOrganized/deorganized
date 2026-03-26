@@ -381,6 +381,9 @@ export const PredictionWars: React.FC<PredictionWarsProps> = ({ onNavigate, coin
           <p className="text-inkLight/50 text-xs mt-6 font-mono">
             DeOrganized is the broadcast partner for Prediction Wars Season 1.
           </p>
+          <p className="text-inkLight/40 text-xs mt-8 max-w-xl mx-auto leading-relaxed">
+            Memecoin Prediction Wars markets are operated by Stacksmarket. DeOrganized is a media and broadcast partner — we do not operate markets, accept funds, or facilitate trades. Participation involves financial risk. This page is for informational purposes only and does not constitute financial advice. Trade only what you can afford to lose.
+          </p>
         </div>
       </section>
     </div>
