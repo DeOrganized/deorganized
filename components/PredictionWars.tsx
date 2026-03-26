@@ -111,19 +111,21 @@ export const PredictionWars: React.FC<PredictionWarsProps> = ({ onNavigate, coin
           </p>
 
           {/* Powered by StacksMarket */}
-          <a
-            href={stacksmarketBranding.siteUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mb-8 opacity-70 hover:opacity-100 transition-opacity"
-          >
-            <span className="text-inkLight text-xs font-mono uppercase tracking-widest">Powered by</span>
-            <img
-              src={stacksmarketBranding.logoUrl}
-              alt="StacksMarket"
-              className="h-5 w-auto"
-            />
-          </a>
+          <div className="flex items-center justify-center gap-3 mb-10 px-5 py-3 rounded-2xl border border-borderSubtle bg-surface">
+            <span className="text-inkLight text-sm font-mono uppercase tracking-widest">Powered by</span>
+            <a
+              href={stacksmarketBranding.siteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:opacity-80 transition-opacity"
+            >
+              <img
+                src={stacksmarketBranding.logoUrl}
+                alt="StacksMarket"
+                className="h-8 w-auto"
+              />
+            </a>
+          </div>
 
           {/* Coin chips */}
           <div className="flex flex-wrap items-center justify-center gap-2 mb-10">
