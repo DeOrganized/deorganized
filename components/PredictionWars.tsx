@@ -122,7 +122,7 @@ export const PredictionWars: React.FC<PredictionWarsProps> = ({ onNavigate, coin
               <img
                 src={stacksmarketBranding.logoUrl}
                 alt="StacksMarket"
-                className="h-8 w-auto"
+                className="h-16 w-auto"
               />
             </a>
           </div>
