@@ -7,9 +7,9 @@ interface RoundTimelineProps {
 }
 
 const DOT_STYLES: Record<Round['status'], string> = {
-  live: 'bg-emerald-400',
-  resolved: 'bg-white/60',
-  upcoming: 'bg-white/20',
+  live: 'bg-emerald-500',
+  resolved: 'bg-inkLight',
+  upcoming: 'bg-borderSubtle',
 };
 
 function fmtDate(iso: string) {
@@ -28,25 +28,25 @@ export const RoundTimeline: React.FC<RoundTimelineProps> = ({ rounds, currentRou
           {/* Dot + connector */}
           <div className="flex flex-col items-center">
             <div
-              className={`w-3 h-3 rounded-full mt-0.5 flex-shrink-0 ${DOT_STYLES[round.status]} ${round.status === 'live' ? 'shadow-[0_0_8px_rgba(52,211,153,0.7)]' : ''}`}
+              className={`w-3 h-3 rounded-full mt-0.5 flex-shrink-0 ${DOT_STYLES[round.status]} ${round.status === 'live' ? 'shadow-[0_0_8px_rgba(16,185,129,0.6)]' : ''}`}
             />
             {i < rounds.length - 1 && (
-              <div className="w-px flex-1 bg-white/10 my-1.5" style={{ minHeight: 24 }} />
+              <div className="w-px flex-1 bg-borderSubtle my-1.5" style={{ minHeight: 24 }} />
             )}
           </div>
 
           {/* Content */}
-          <div className={`pb-6 ${round.number === currentRound ? 'opacity-100' : 'opacity-45'}`}>
+          <div className={`pb-6 ${round.number === currentRound ? 'opacity-100' : 'opacity-40'}`}>
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="font-mono font-bold text-white text-sm">Round {round.number}</span>
+              <span className="font-mono font-bold text-ink text-sm">Round {round.number}</span>
               {round.status === 'live' && (
-                <span className="text-xs font-mono text-emerald-400 uppercase tracking-wide">Live</span>
+                <span className="text-xs font-mono text-emerald-500 dark:text-emerald-400 uppercase tracking-wide">Live</span>
               )}
               {round.status === 'resolved' && (
-                <span className="text-xs font-mono text-white/30 uppercase tracking-wide">Resolved</span>
+                <span className="text-xs font-mono text-inkLight uppercase tracking-wide">Resolved</span>
               )}
             </div>
-            <div className="text-white/35 text-xs font-mono">
+            <div className="text-inkLight text-xs font-mono">
               {fmtDate(round.startDate)} — {fmtDateFull(round.resolveDate)}
             </div>
           </div>

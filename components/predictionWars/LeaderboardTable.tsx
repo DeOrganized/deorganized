@@ -10,34 +10,32 @@ interface LeaderboardTableProps {
 export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ entries, memecoins }) => {
   if (entries.length === 0) {
     return (
-      <div className="rounded-xl border border-white/10 p-10 text-center"
-        style={{ background: 'rgba(255,255,255,0.03)' }}
-      >
-        <p className="text-white/40 font-mono text-sm">Leaderboard updates after Round 1 resolves</p>
-        <p className="text-white/20 font-mono text-xs mt-1">March 27, 2026 at 20:00 UTC</p>
+      <div className="rounded-xl border border-borderSubtle bg-surface p-10 text-center">
+        <p className="text-inkLight font-mono text-sm">Leaderboard updates after Round 1 resolves</p>
+        <p className="text-inkLight/60 font-mono text-xs mt-1">March 27, 2026 at 20:00 UTC</p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-white/10">
+    <div className="overflow-x-auto rounded-xl border border-borderSubtle">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-white/10" style={{ background: 'rgba(255,255,255,0.04)' }}>
-            <th className="text-left px-4 py-3 text-white/40 font-mono text-xs">#</th>
-            <th className="text-left px-4 py-3 text-white/40 font-mono text-xs">COIN</th>
-            <th className="text-right px-4 py-3 text-white/40 font-mono text-xs">SCORE</th>
-            <th className="text-right px-4 py-3 text-white/40 font-mono text-xs hidden sm:table-cell">VOLUME (STX)</th>
-            <th className="text-right px-4 py-3 text-white/40 font-mono text-xs hidden sm:table-cell">USERS</th>
-            <th className="text-center px-4 py-3 text-white/40 font-mono text-xs">TIER</th>
+          <tr className="border-b border-borderSubtle bg-surface">
+            <th className="text-left px-4 py-3 text-inkLight font-mono text-xs">#</th>
+            <th className="text-left px-4 py-3 text-inkLight font-mono text-xs">COIN</th>
+            <th className="text-right px-4 py-3 text-inkLight font-mono text-xs">SCORE</th>
+            <th className="text-right px-4 py-3 text-inkLight font-mono text-xs hidden sm:table-cell">VOLUME (STX)</th>
+            <th className="text-right px-4 py-3 text-inkLight font-mono text-xs hidden sm:table-cell">USERS</th>
+            <th className="text-center px-4 py-3 text-inkLight font-mono text-xs">TIER</th>
           </tr>
         </thead>
         <tbody>
           {entries.map((entry) => {
             const coin = memecoins.find(c => c.symbol === entry.memecoin);
             return (
-              <tr key={entry.memecoin} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
-                <td className="px-4 py-3 text-white/40 font-mono text-sm">{entry.rank}</td>
+              <tr key={entry.memecoin} className="border-b border-borderSubtle hover:bg-surface transition-colors">
+                <td className="px-4 py-3 text-inkLight font-mono text-sm">{entry.rank}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     {coin && (
@@ -55,11 +53,11 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ entries, mem
                     </span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right font-mono font-bold text-white">{entry.score}</td>
-                <td className="px-4 py-3 text-right font-mono text-white/60 hidden sm:table-cell">
+                <td className="px-4 py-3 text-right font-mono font-bold text-ink">{entry.score}</td>
+                <td className="px-4 py-3 text-right font-mono text-inkLight hidden sm:table-cell">
                   {entry.totalVolumeSTX.toLocaleString()}
                 </td>
-                <td className="px-4 py-3 text-right font-mono text-white/60 hidden sm:table-cell">
+                <td className="px-4 py-3 text-right font-mono text-inkLight hidden sm:table-cell">
                   {entry.totalUsers}
                 </td>
                 <td className="px-4 py-3 text-center">

@@ -75,7 +75,7 @@ export const predictionWarsData: PredictionWarsData = {
           question: 'Will STX close ABOVE 0.2350 at 20:00 UTC on March 27, 2026?',
         },
         {
-          memecoin: 'SAI',
+          memecoin: 'PEPE',
           market: 'NASDAQ',
           pollUrl: 'https://www.stacksmarket.app/poll/69c550e7512fb6362ccf187c',
           trackedUrl: 'https://go.deorganized.com/r/stacksmarket-mkt-20260326-3',
@@ -136,11 +136,14 @@ export const predictionWarsData: PredictionWarsData = {
       iconUrlOriginal: 'https://i.ibb.co/RGsrQ52N/WELSH.jpg',
     },
     {
-      symbol: 'SAI',
-      name: 'SAI',
+      symbol: 'PEPE',
+      name: 'Pepe Coin',
       color: '#AFA9EC',
-      iconUrl: '/images/prediction-wars/SAI.png',
+      iconUrl: '/images/prediction-wars/PEPE.png',
       iconUrlOriginal: 'https://i.ibb.co/9PQNVf9/PEPE.png',
+      externalLinks: {
+        twitter: 'https://x.com/PepeCoinSTX',
+      },
     },
     {
       symbol: 'ROO',
@@ -181,4 +184,4 @@ export function getCoinData(symbol: string): Memecoin | undefined {
   return predictionWarsData.memecoins.find(c => c.symbol === symbol.toUpperCase());
 }
 
-export const VALID_COIN_SLUGS = ['leo', 'welsh', 'sai', 'roo', 'flat', 'play'];
+export const VALID_COIN_SLUGS = ['leo', 'welsh', 'pepe', 'roo', 'flat', 'play'];

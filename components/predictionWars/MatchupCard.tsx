@@ -13,9 +13,7 @@ export const MatchupCard: React.FC<MatchupCardProps> = ({ matchup, coin, roundSt
   const marketLabel = MARKET_LABELS[matchup.market] || matchup.market;
 
   return (
-    <div className="rounded-xl p-5 flex flex-col gap-4 border border-white/10 hover:border-white/20 transition-colors"
-      style={{ background: 'rgba(255,255,255,0.04)' }}
-    >
+    <div className="rounded-xl p-5 flex flex-col gap-4 border border-borderSubtle bg-surface hover:opacity-90 transition-opacity">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -32,20 +30,20 @@ export const MatchupCard: React.FC<MatchupCardProps> = ({ matchup, coin, roundSt
             <div className="font-mono font-bold text-base" style={{ color: coin.color }}>
               {coin.symbol}
             </div>
-            <div className="text-white/40 text-xs font-mono">vs {marketLabel}</div>
+            <div className="text-inkLight text-xs font-mono">vs {marketLabel}</div>
           </div>
         </div>
-        <StatusBadge status={roundStatus} result={matchup.result} />
+        <StatusBadge status={roundStatus} />
       </div>
 
       {/* Question */}
-      <p className="text-white/65 text-sm leading-relaxed">{matchup.question}</p>
+      <p className="text-inkLight text-sm leading-relaxed">{matchup.question}</p>
 
       {/* Result (if resolved) */}
       {roundStatus === 'resolved' && matchup.result && (
         <div className="flex items-center gap-2 text-sm font-mono font-bold">
-          <span className="text-white/40">Result:</span>
-          <span className={matchup.result === 'higher' ? 'text-emerald-400' : 'text-red-400'}>
+          <span className="text-inkLight">Result:</span>
+          <span className={matchup.result === 'higher' ? 'text-emerald-500' : 'text-red-500'}>
             {matchup.result === 'higher' ? '↑ Higher' : '↓ Lower'}
           </span>
         </div>
@@ -53,7 +51,7 @@ export const MatchupCard: React.FC<MatchupCardProps> = ({ matchup, coin, roundSt
 
       {/* Stats (if present) */}
       {(matchup.volumeSTX || matchup.uniqueWallets) && (
-        <div className="flex gap-4 text-xs font-mono text-white/40">
+        <div className="flex gap-4 text-xs font-mono text-inkLight">
           {matchup.volumeSTX && <span>{matchup.volumeSTX.toLocaleString()} STX</span>}
           {matchup.uniqueWallets && <span>{matchup.uniqueWallets} wallets</span>}
         </div>
@@ -79,31 +77,18 @@ export const MatchupCard: React.FC<MatchupCardProps> = ({ matchup, coin, roundSt
   );
 };
 
-const StatusBadge: React.FC<{ status: string; result?: 'higher' | 'lower' | null }> = ({ status, result }) => {
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   if (status === 'live') {
     return (
-      <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-mono border"
-        style={{ background: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.25)', color: '#34d399' }}
-      >
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+      <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-mono border border-emerald-500/25 bg-emerald-500/10 text-emerald-500 dark:border-emerald-500/25 dark:text-emerald-400">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
         LIVE
       </span>
     );
   }
-  if (status === 'resolved') {
-    return (
-      <span className="px-2 py-1 rounded-full text-xs font-mono border"
-        style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.4)' }}
-      >
-        RESOLVED
-      </span>
-    );
-  }
   return (
-    <span className="px-2 py-1 rounded-full text-xs font-mono border"
-      style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.4)' }}
-    >
-      UPCOMING
+    <span className="px-2 py-1 rounded-full text-xs font-mono border border-borderSubtle text-inkLight">
+      {status === 'resolved' ? 'RESOLVED' : 'UPCOMING'}
     </span>
   );
 };
