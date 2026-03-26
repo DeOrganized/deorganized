@@ -196,7 +196,11 @@ const AppContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-canvas font-sans selection:bg-gold/20 selection:text-ink overflow-x-hidden text-ink">
       <Navbar onNavigate={handleNavigate} currentPage={currentView} />
-      {currentView === 'home' && <PredictionWarsBanner onNavigate={handleNavigate} />}
+      {currentView === 'home' && (
+        <div className="mt-20">
+          <PredictionWarsBanner onNavigate={handleNavigate} />
+        </div>
+      )}
       <main>
         {renderContent()}
       </main>
