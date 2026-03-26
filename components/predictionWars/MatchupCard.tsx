@@ -13,7 +13,13 @@ export const MatchupCard: React.FC<MatchupCardProps> = ({ matchup, coin, roundSt
   const marketLabel = MARKET_LABELS[matchup.market] || matchup.market;
 
   return (
-    <div className="rounded-xl p-5 flex flex-col gap-4 border border-borderSubtle bg-surface hover:opacity-90 transition-opacity">
+    <div
+      className="rounded-xl p-5 flex flex-col gap-4 border hover:opacity-90 transition-opacity"
+      style={{
+        backgroundColor: coin.color + '12',
+        borderColor: coin.color + '44',
+      }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
