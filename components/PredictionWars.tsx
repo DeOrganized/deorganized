@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { ExternalLink, Swords, Trophy, TrendingUp, Users, Zap, Info } from 'lucide-react';
 import {
   predictionWarsData,
@@ -43,7 +44,31 @@ export const PredictionWars: React.FC<PredictionWarsProps> = ({ onNavigate, coin
     ? leaderboard.filter(e => e.memecoin === activeCoin.symbol)
     : leaderboard;
 
+  const ogImage = 'https://www.deorganized.com/images/prediction-wars/og-card.png';
+  const pageTitle = activeCoin
+    ? `${activeCoin.symbol} — Prediction Wars | DeOrganized`
+    : 'Prediction Wars | DeOrganized';
+  const pageDesc = activeCoin
+    ? `Follow ${activeCoin.symbol} in the Memecoin Prediction Wars on StacksMarket. Season 1 live now.`
+    : '6 memecoins. 6 real markets. One leaderboard. Trade predictions on BTC, STX, Gold, Oil, S&P, and NASDAQ. Powered by StacksMarket.';
+  const pageUrl = activeCoin
+    ? `https://www.deorganized.com/prediction-wars/${activeCoin.symbol.toLowerCase()}`
+    : 'https://www.deorganized.com/prediction-wars';
+
   return (
+    <>
+    <Helmet>
+      <title>{pageTitle}</title>
+      <meta property="og:title" content="Memecoin Prediction Wars — Season 1 Live" />
+      <meta property="og:description" content={pageDesc} />
+      <meta property="og:image" content={ogImage} />
+      <meta property="og:url" content={pageUrl} />
+      <meta property="og:type" content="website" />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content="Memecoin Prediction Wars — Season 1 Live" />
+      <meta name="twitter:description" content={pageDesc} />
+      <meta name="twitter:image" content={ogImage} />
+    </Helmet>
     <div
       className="min-h-screen bg-canvas"
       style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}
@@ -387,6 +412,7 @@ export const PredictionWars: React.FC<PredictionWarsProps> = ({ onNavigate, coin
         </div>
       </section>
     </div>
+    </>
   );
 };
 

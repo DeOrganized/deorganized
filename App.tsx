@@ -26,6 +26,7 @@ import { CreateCommunity } from './components/communities/CreateCommunity';
 import { CommunityManage } from './components/communities/CommunityManage';
 import { PredictionWars } from './components/PredictionWars';
 import { PredictionWarsBanner } from './components/predictionWars/PredictionWarsBanner';
+import { HelmetProvider } from 'react-helmet-async';
 
 
 type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps' | 'communities' | 'community-page' | 'community-manage' | 'create-community' | 'prediction-wars';
@@ -212,11 +213,13 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
-    </AuthProvider>
+    <HelmetProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </AuthProvider>
+    </HelmetProvider>
   );
 };
 
