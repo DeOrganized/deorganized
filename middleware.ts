@@ -46,13 +46,10 @@ function buildMetaTags(pathname: string): string {
 }
 
 export default async function middleware(request: Request): Promise<Response | undefined> {
-  // Break the subrequest loop — when we fetch index.html ourselves we add
-  // this header so the middleware passes straight through on that request.
-  if (request.headers.get('x-pw-bypass') === '1') {
-    return undefined;
-  }
-
   const url = new URL(request.url);
+
+  // Never intercept static assets — only handle extensionless SPA routes.
+  if (/\.[a-zA-Z0-9]+$/.test(url.pathname)) return undefined;
 
   try {
     // Fetch the static index.html directly, bypassing this middleware.
