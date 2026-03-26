@@ -171,6 +171,12 @@ export const predictionWarsData: PredictionWarsData = {
 
 export const STACKSMARKET_HOME = 'https://go.deorganized.com/r/stacksmarket-mkt-20260326-7';
 
+export const stacksmarketBranding = {
+  logoUrl: '/images/prediction-wars/stacksmarket-logo.png',
+  iconUrl: '/images/prediction-wars/stacksmarket-icon.png',
+  siteUrl: 'https://www.stacksmarket.app',
+};
+
 export const MARKET_LABELS: Record<string, string> = {
   BTC: 'Bitcoin',
   STX: 'Stacks',

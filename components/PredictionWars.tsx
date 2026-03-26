@@ -6,6 +6,7 @@ import {
   STACKSMARKET_HOME,
   MARKET_LABELS,
   VALID_COIN_SLUGS,
+  stacksmarketBranding,
   Memecoin,
   Matchup,
 } from '../data/predictionWars';
@@ -108,6 +109,21 @@ export const PredictionWars: React.FC<PredictionWarsProps> = ({ onNavigate, coin
               ? `Follow ${activeCoin.symbol}'s performance in the live prediction league on StacksMarket.`
               : 'Six memecoins. Six real markets. One winner. Pick your side and trade the outcome on StacksMarket.'}
           </p>
+
+          {/* Powered by StacksMarket */}
+          <a
+            href={stacksmarketBranding.siteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 mb-8 opacity-70 hover:opacity-100 transition-opacity"
+          >
+            <span className="text-inkLight text-xs font-mono uppercase tracking-widest">Powered by</span>
+            <img
+              src={stacksmarketBranding.logoUrl}
+              alt="StacksMarket"
+              className="h-5 w-auto"
+            />
+          </a>
 
           {/* Coin chips */}
           <div className="flex flex-wrap items-center justify-center gap-2 mb-10">

@@ -1,5 +1,5 @@
 import React from 'react';
-import { predictionWarsData, getCoinData } from '../../data/predictionWars';
+import { predictionWarsData, getCoinData, stacksmarketBranding } from '../../data/predictionWars';
 
 interface PredictionWarsBannerProps {
   onNavigate: (page: string) => void;
@@ -34,11 +34,18 @@ export const PredictionWarsBanner: React.FC<PredictionWarsBannerProps> = ({ onNa
             {/* Static label at start of each copy */}
             <div className="flex items-center px-5 py-2.5 flex-shrink-0 whitespace-nowrap">
               <span
-                className="flex items-center gap-1.5 text-xs font-mono font-bold text-white/70 px-3 py-1 rounded-full border border-white/10"
+                className="flex items-center gap-2 text-xs font-mono font-bold text-white/70 px-3 py-1 rounded-full border border-white/10"
                 style={{ background: 'rgba(255,255,255,0.05)' }}
               >
+                <img
+                  src={stacksmarketBranding.iconUrl}
+                  alt="StacksMarket"
+                  width={16}
+                  height={16}
+                  className="rounded-sm flex-shrink-0"
+                />
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-                ⚡ STACKSMARKET PREDICTION WARS · LIVE NOW
+                PREDICTION WARS · LIVE NOW
               </span>
             </div>
             <span className="text-white/15 text-xs font-mono flex-shrink-0 self-center px-1">·</span>
