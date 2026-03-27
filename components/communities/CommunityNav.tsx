@@ -1,15 +1,15 @@
 import React from 'react';
 
-type CommunityTab = 'feed' | 'shows' | 'events' | 'merch' | 'members';
+type BaseTab = 'feed' | 'shows' | 'events' | 'merch' | 'members';
 
 interface Props {
-    activeTab: CommunityTab;
-    onTabChange: (tab: CommunityTab) => void;
+    activeTab: string;
+    onTabChange: (tab: string) => void;
     showManage?: boolean;
     onManage?: () => void;
 }
 
-const TABS: { id: CommunityTab; label: string }[] = [
+const TABS: { id: BaseTab; label: string }[] = [
     { id: 'feed', label: 'Feed' },
     { id: 'shows', label: 'Shows' },
     { id: 'events', label: 'Events' },
