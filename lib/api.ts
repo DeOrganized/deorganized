@@ -2015,35 +2015,35 @@ export interface Message {
     cohost_invite_id?: number; // client-side enrichment only
 }
 
-export const fetchThreads = async (accessToken: string): Promise<Thread[]> => {
-    const res = await fetch(`${API_BASE_URL}/messages/threads/`, {
+export const fetchThreads = async (accessToken: string, options?: Partial<X402PaymentOptions>): Promise<Thread[]> => {
+    const { response } = await x402Fetch(`${API_BASE_URL}/messages/threads/`, {
         headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!res.ok) throw new Error('Failed to fetch threads');
-    const data = await res.json();
+    }, options);
+    if (!response.ok) throw new Error('Failed to fetch threads');
+    const data = await response.json();
     return data.results ?? data;
 };
 
-export const fetchMessages = async (threadId: number, accessToken: string): Promise<Message[]> => {
-    const res = await fetch(`${API_BASE_URL}/messages/threads/${threadId}/messages/`, {
+export const fetchMessages = async (threadId: number, accessToken: string, options?: Partial<X402PaymentOptions>): Promise<Message[]> => {
+    const { response } = await x402Fetch(`${API_BASE_URL}/messages/threads/${threadId}/messages/`, {
         headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!res.ok) throw new Error('Failed to fetch messages');
-    const data = await res.json();
+    }, options);
+    if (!response.ok) throw new Error('Failed to fetch messages');
+    const data = await response.json();
     return data.results ?? data;
 };
 
-export const sendMessage = async (threadId: number, text: string, accessToken: string): Promise<Message> => {
-    const res = await fetch(`${API_BASE_URL}/messages/threads/${threadId}/messages/`, {
+export const sendMessage = async (threadId: number, text: string, accessToken: string, options?: Partial<X402PaymentOptions>): Promise<Message> => {
+    const { response } = await x402Fetch(`${API_BASE_URL}/messages/threads/${threadId}/messages/`, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({ body: text }),
-    });
-    if (!res.ok) throw new Error('Failed to send message');
-    return res.json();
+    }, options);
+    if (!response.ok) throw new Error('Failed to send message');
+    return response.json();
 };
 
 export const startThread = async (recipientId: number, accessToken: string): Promise<Thread> => {

@@ -26,7 +26,7 @@ import { CreateCommunity } from './components/communities/CreateCommunity';
 import { CommunityManage } from './components/communities/CommunityManage';
 import { MessagingPage } from './pages/MessagingPage';
 
-type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps' | 'communities' | 'community-page' | 'community-manage' | 'create-community' | 'messages';
+type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps' | 'communities' | 'community-page' | 'community-manage' | 'create-community' | 'messaging';
 
 // Map URL paths to page views and extract IDs
 function parseUrl(pathname: string): { page: PageView; id: string | number | null } {
@@ -68,7 +68,8 @@ function parseUrl(pathname: string): { page: PageView; id: string | number | nul
       if (parts[2] === 'manage') return { page: 'community-manage', id: param };
       return { page: 'community-page', id: param };
     case 'messages':
-      return { page: 'messages', id: null };
+    case 'messaging':
+      return { page: 'messaging', id: null };
     default:
       return { page: 'home', id: null };
   }
@@ -96,7 +97,7 @@ function pageToUrl(page: PageView, id?: string | number | null): string {
     case 'community-page': return `/c/${id}`;
     case 'community-manage': return `/c/${id}/manage`;
     case 'create-community': return '/create-community';
-    case 'messages': return '/messages';
+    case 'messaging': return '/messaging';
     case 'home':
     default: return '/';
   }
@@ -192,7 +193,7 @@ const AppContent: React.FC = () => {
         return selectedId ? <CommunityManage onNavigate={handleNavigate} slug={String(selectedId)} /> : <div>Community not found</div>;
       case 'create-community':
         return <CreateCommunity onNavigate={handleNavigate} />;
-      case 'messages':
+      case 'messaging':
         return <MessagingPage onNavigate={handleNavigate} />;
       case 'home':
       default:

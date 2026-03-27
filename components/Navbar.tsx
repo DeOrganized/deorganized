@@ -241,8 +241,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
 
               {/* Messages icon */}
               <button
-                onClick={() => handleNavClick('messages')}
-                className={`relative w-10 h-10 rounded-full bg-surface border hover:border-gold/50 flex items-center justify-center transition-all shadow-sm ${currentPage === 'messages' ? 'border-gold text-gold' : 'border-borderSubtle text-inkLight hover:text-gold'}`}
+                onClick={() => handleNavClick('messaging')}
+                className={`relative w-10 h-10 rounded-full bg-surface border hover:border-gold/50 flex items-center justify-center transition-all shadow-sm ${currentPage === 'messaging' ? 'border-gold text-gold' : 'border-borderSubtle text-inkLight hover:text-gold'}`}
                 aria-label="Messages"
               >
                 <MessageSquare className="w-4 h-4" />
@@ -321,7 +321,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 </button>
               )}
               <button
-                onClick={() => handleNavClick('messages')}
+                onClick={() => handleNavClick('messaging')}
                 className="text-lg font-medium text-left text-ink hover:text-gold"
               >
                 💬 Messages
