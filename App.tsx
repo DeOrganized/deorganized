@@ -27,6 +27,11 @@ import { CommunityManage } from './components/communities/CommunityManage';
 import { MessagingPage } from './pages/MessagingPage';
 
 type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps' | 'communities' | 'community-page' | 'community-manage' | 'create-community' | 'messaging';
+import { PredictionWars } from './components/PredictionWars';
+import { PredictionWarsBanner } from './components/predictionWars/PredictionWarsBanner';
+
+
+type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps' | 'communities' | 'community-page' | 'community-manage' | 'create-community' | 'prediction-wars';
 
 // Map URL paths to page views and extract IDs
 function parseUrl(pathname: string): { page: PageView; id: string | number | null } {
@@ -70,6 +75,9 @@ function parseUrl(pathname: string): { page: PageView; id: string | number | nul
     case 'messages':
     case 'messaging':
       return { page: 'messaging', id: null };
+    case 'prediction-wars':
+    case 'pw':
+      return { page: 'prediction-wars', id: param }; // param is the coin slug if present
     default:
       return { page: 'home', id: null };
   }
@@ -98,6 +106,7 @@ function pageToUrl(page: PageView, id?: string | number | null): string {
     case 'community-manage': return `/c/${id}/manage`;
     case 'create-community': return '/create-community';
     case 'messaging': return '/messaging';
+    case 'prediction-wars': return id ? `/prediction-wars/${id}` : '/prediction-wars';
     case 'home':
     default: return '/';
   }
@@ -195,6 +204,8 @@ const AppContent: React.FC = () => {
         return <CreateCommunity onNavigate={handleNavigate} />;
       case 'messaging':
         return <MessagingPage onNavigate={handleNavigate} />;
+      case 'prediction-wars':
+        return <PredictionWars onNavigate={handleNavigate} coin={selectedId ? String(selectedId) : undefined} />;
       case 'home':
       default:
         return <Hero onNavigate={handleNavigate} />;
@@ -205,6 +216,11 @@ const AppContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-canvas font-sans selection:bg-gold/20 selection:text-ink overflow-x-hidden text-ink">
       <Navbar onNavigate={handleNavigate} currentPage={currentView} />
+      {currentView === 'home' && (
+        <div className="mt-20">
+          <PredictionWarsBanner onNavigate={handleNavigate} />
+        </div>
+      )}
       <main>
         {renderContent()}
       </main>
