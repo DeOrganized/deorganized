@@ -56,7 +56,7 @@ export const predictionWarsData: PredictionWarsData = {
   rounds: [
     {
       number: 1,
-      status: 'live',
+      status: 'resolved',
       startDate: '2026-03-26',
       resolveDate: '2026-03-27',
       matchups: [
@@ -66,6 +66,10 @@ export const predictionWarsData: PredictionWarsData = {
           pollUrl: 'https://www.stacksmarket.app/poll/69c552e5512fb6362ccf1b21',
           trackedUrl: 'https://go.deorganized.com/r/stacksmarket-mkt-20260326',
           question: 'Will Bitcoin close ABOVE $69,000 at 20:00 UTC on March 27, 2026?',
+          result: 'lower',
+          volumeSTX: 1896.4,
+          uniqueWallets: 9,
+          tradeCount: 26,
         },
         {
           memecoin: 'WELSH',
@@ -73,6 +77,10 @@ export const predictionWarsData: PredictionWarsData = {
           pollUrl: 'https://www.stacksmarket.app/poll/69c54b53512fb6362ccf1495',
           trackedUrl: 'https://go.deorganized.com/r/stacksmarket-mkt-20260326-2',
           question: 'Will STX close ABOVE 0.2350 at 20:00 UTC on March 27, 2026?',
+          result: 'lower',
+          volumeSTX: 1206.96,
+          uniqueWallets: 9,
+          tradeCount: 19,
         },
         {
           memecoin: 'PEPE',
@@ -80,6 +88,10 @@ export const predictionWarsData: PredictionWarsData = {
           pollUrl: 'https://www.stacksmarket.app/poll/69c550e7512fb6362ccf187c',
           trackedUrl: 'https://go.deorganized.com/r/stacksmarket-mkt-20260326-3',
           question: 'Will NASDAQ 100 close ABOVE 24,100 at 20:00 UTC on March 27, 2026?',
+          result: 'lower',
+          volumeSTX: 1306.56,
+          uniqueWallets: 7,
+          tradeCount: 19,
         },
         {
           memecoin: 'ROO',
@@ -87,6 +99,10 @@ export const predictionWarsData: PredictionWarsData = {
           pollUrl: 'https://www.stacksmarket.app/poll/69c542e6512fb6362ccf1027',
           trackedUrl: 'https://go.deorganized.com/r/stacksmarket-mkt-20260326-4',
           question: 'Will Gold close ABOVE $4,450 at 20:00 UTC on March 27, 2026?',
+          result: 'higher',
+          volumeSTX: 1604.32,
+          uniqueWallets: 9,
+          tradeCount: 23,
         },
         {
           memecoin: 'FLAT',
@@ -94,6 +110,10 @@ export const predictionWarsData: PredictionWarsData = {
           pollUrl: 'https://www.stacksmarket.app/poll/69c54880512fb6362ccf135b',
           trackedUrl: 'https://go.deorganized.com/r/stacksmarket-mkt-20260326-5',
           question: 'Will the S&P 500 close ABOVE 6,610 at 20:00 UTC on March 27, 2026?',
+          result: 'lower',
+          volumeSTX: 1134.64,
+          uniqueWallets: 5,
+          tradeCount: 17,
         },
         {
           memecoin: 'PLAY',
@@ -101,6 +121,10 @@ export const predictionWarsData: PredictionWarsData = {
           pollUrl: 'https://www.stacksmarket.app/poll/69c54eb2512fb6362ccf1741',
           trackedUrl: 'https://go.deorganized.com/r/stacksmarket-mkt-20260326-6',
           question: 'Will WTI Crude Oil close ABOVE $94.00 at 20:00 UTC on March 27, 2026?',
+          result: 'higher',
+          volumeSTX: 1687.36,
+          uniqueWallets: 13,
+          tradeCount: 27,
         },
       ],
     },
@@ -119,7 +143,16 @@ export const predictionWarsData: PredictionWarsData = {
       matchups: [],
     },
   ],
-  leaderboard: [],
+  // Social scores are pending — socialRank is 0 for all entries until Stacksmarket provides social data.
+  // Score is calculated from volume rank (60%) + wallet rank (20%) only for Round 1.
+  leaderboard: [
+    { memecoin: 'LEO',   rank: 1, score: 1.0, volumeRank: 1, walletRank: 2, socialRank: 0, tier: 'top',     totalVolumeSTX: 1896.40, totalUsers: 9  },
+    { memecoin: 'PLAY',  rank: 2, score: 1.4, volumeRank: 2, walletRank: 1, socialRank: 0, tier: 'top',     totalVolumeSTX: 1687.36, totalUsers: 13 },
+    { memecoin: 'ROO',   rank: 3, score: 2.2, volumeRank: 3, walletRank: 2, socialRank: 0, tier: 'mid',     totalVolumeSTX: 1604.32, totalUsers: 9  },
+    { memecoin: 'PEPE',  rank: 4, score: 3.4, volumeRank: 4, walletRank: 5, socialRank: 0, tier: 'mid',     totalVolumeSTX: 1306.56, totalUsers: 7  },
+    { memecoin: 'WELSH', rank: 5, score: 3.4, volumeRank: 5, walletRank: 2, socialRank: 0, tier: 'at-risk', totalVolumeSTX: 1206.96, totalUsers: 9  },
+    { memecoin: 'FLAT',  rank: 6, score: 4.8, volumeRank: 6, walletRank: 6, socialRank: 0, tier: 'at-risk', totalVolumeSTX: 1134.64, totalUsers: 5  },
+  ],
   memecoins: [
     {
       symbol: 'LEO',

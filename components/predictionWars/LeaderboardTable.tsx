@@ -24,7 +24,9 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ entries, mem
           <tr className="border-b border-borderSubtle bg-surface">
             <th className="text-left px-4 py-3 text-inkLight font-mono text-xs">#</th>
             <th className="text-left px-4 py-3 text-inkLight font-mono text-xs">COIN</th>
-            <th className="text-right px-4 py-3 text-inkLight font-mono text-xs">SCORE</th>
+            <th className="text-right px-4 py-3 text-inkLight font-mono text-xs">
+              SCORE <span className="text-inkLight/50 normal-case font-sans font-normal" title="Social score pending">*</span>
+            </th>
             <th className="text-right px-4 py-3 text-inkLight font-mono text-xs hidden sm:table-cell">VOLUME (STX)</th>
             <th className="text-right px-4 py-3 text-inkLight font-mono text-xs hidden sm:table-cell">USERS</th>
             <th className="text-center px-4 py-3 text-inkLight font-mono text-xs">TIER</th>
@@ -68,6 +70,9 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({ entries, mem
           })}
         </tbody>
       </table>
+      <p className="px-4 py-2 text-inkLight/50 font-mono text-xs border-t border-borderSubtle">
+        * Social score pending — will be added when available from Stacksmarket
+      </p>
     </div>
   );
 };
