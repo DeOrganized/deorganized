@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, X, Globe, User, Wallet, Moon, Sun } from 'lucide-react';
+import { Menu, X, Globe, User, Wallet, Moon, Sun, MessageSquare } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useTheme } from '../lib/ThemeContext';
 import { fetchNotifications, getDapNotifications, markDapNotificationsRead } from '../lib/api';
@@ -223,18 +223,29 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
 
           {isBackendAuthenticated && backendUser ? (
             <>
-              {/* Dashboard link for all authenticated users */}
+              {/* Studio link — creators and staff only */}
+              {(backendUser.role === 'creator' || backendUser.is_staff) && (
+                <button
+                  onClick={() => handleNavClick('dashboard')}
+                  className={`relative text-sm font-medium transition-colors ${currentPage === 'dashboard' ? 'text-gold' : 'text-inkLight hover:text-gold'
+                    }`}
+                >
+                  Studio
+                  {unreadNotifications > 0 && (
+                    <span className="absolute -top-1 -right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                      {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {/* Messages icon */}
               <button
-                onClick={() => handleNavClick('dashboard')}
-                className={`relative text-sm font-medium transition-colors ${currentPage === 'dashboard' ? 'text-gold' : 'text-inkLight hover:text-gold'
-                  }`}
+                onClick={() => handleNavClick('messaging')}
+                className={`relative w-10 h-10 rounded-full bg-surface border hover:border-gold/50 flex items-center justify-center transition-all shadow-sm ${currentPage === 'messaging' ? 'border-gold text-gold' : 'border-borderSubtle text-inkLight hover:text-gold'}`}
+                aria-label="Messages"
               >
-                Studio
-                {unreadNotifications > 0 && (
-                  <span className="absolute -top-1 -right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                  </span>
-                )}
+                <MessageSquare className="w-4 h-4" />
               </button>
 
               {/* Profile button */}
@@ -301,11 +312,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
 
           {isBackendAuthenticated && backendUser ? (
             <>
+              {(backendUser.role === 'creator' || backendUser.is_staff) && (
+                <button
+                  onClick={() => handleNavClick('dashboard')}
+                  className="text-lg font-medium text-left text-ink hover:text-gold"
+                >
+                  Studio
+                </button>
+              )}
               <button
-                onClick={() => handleNavClick('dashboard')}
+                onClick={() => handleNavClick('messaging')}
                 className="text-lg font-medium text-left text-ink hover:text-gold"
               >
-                Studio
+                💬 Messages
               </button>
               <button
                 onClick={() => handleNavClick('user-profile')}

@@ -47,6 +47,7 @@ import EpisodeManager from './EpisodeManager';
 import { ContentEngine } from './ContentEngine';
 import { PlayoutEngine } from './PlayoutEngine';
 import { useToast } from './Toast';
+import { CreatorPreferences } from './CreatorDashboard/CreatorPreferences';
 
 interface CreatorDashboardProps {
    onNavigate: (page: string, id?: string | number) => void;
@@ -1464,77 +1465,34 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                   ) : (
                      notifications.slice(0, 5).map((notification) => {
                         const getNotificationContent = () => {
+                           const txt = notification.text || notification.message;
                            switch (notification.notification_type) {
                               case 'follow':
-                                 return {
-                                    icon: Users,
-                                    color: 'text-blue-500 bg-blue-50',
-                                    title: 'New Follower',
-                                    message: `${notification.actor.username} started following you`
-                                 };
+                                 return { icon: Users, color: 'text-blue-500 bg-blue-50', title: 'New Follower', message: txt || `${notification.actor.username} started following you` };
                               case 'like':
-                                 return {
-                                    icon: Heart,
-                                    color: 'text-red-500 bg-red-50',
-                                    title: 'New Like',
-                                    message: `${notification.actor.username} liked your content`
-                                 };
+                                 return { icon: Heart, color: 'text-red-500 bg-red-50', title: 'New Like', message: txt || `${notification.actor.username} liked your content` };
                               case 'comment':
-                                 return {
-                                    icon: MessageSquare,
-                                    color: 'text-green-500 bg-green-50',
-                                    title: 'New Comment',
-                                    message: `${notification.actor.username} commented on your content`
-                                 };
+                                 return { icon: MessageSquare, color: 'text-green-500 bg-green-50', title: 'New Comment', message: txt || `${notification.actor.username} commented on your content` };
                               case 'guest_request':
-                                 return {
-                                    icon: Users,
-                                    color: 'text-purple-500 bg-purple-50',
-                                    title: 'Guest Request',
-                                    message: notification.message || `${notification.actor.username} wants to be on your show`
-                                 };
+                                 return { icon: Users, color: 'text-purple-500 bg-purple-50', title: 'Guest Request', message: txt || `${notification.actor.username} wants to be on your show` };
                               case 'guest_accepted':
-                                 return {
-                                    icon: Check,
-                                    color: 'text-green-500 bg-green-50',
-                                    title: 'Guest Request Accepted',
-                                    message: `${notification.actor.username} accepted your guest request`
-                                 };
+                                 return { icon: Check, color: 'text-green-500 bg-green-50', title: 'Guest Request Accepted', message: txt || `${notification.actor.username} accepted your guest request` };
                               case 'guest_declined':
-                                 return {
-                                    icon: X,
-                                    color: 'text-red-500 bg-red-50',
-                                    title: 'Guest Request Declined',
-                                    message: `${notification.actor.username} declined your guest request`
-                                 };
+                                 return { icon: X, color: 'text-red-500 bg-red-50', title: 'Guest Request Declined', message: txt || `${notification.actor.username} declined your guest request` };
                               case 'co_host_added':
-                                 return {
-                                    icon: Crown,
-                                    color: 'text-gold bg-gold/10',
-                                    title: 'Added as Co-Host',
-                                    message: notification.message || `${notification.actor.username} added you as a co-host`
-                                 };
+                                 return { icon: Crown, color: 'text-gold bg-gold/10', title: 'Co-Host Accepted', message: txt || `${notification.actor.username} accepted your co-host invite` };
+                              case 'co_host_invited':
+                                 return { icon: Crown, color: 'text-gold bg-gold/10', title: 'Co-Host Invite', message: txt || `${notification.actor.username} invited you to be a co-host` };
+                              case 'co_host_accepted_self':
+                                 return { icon: Crown, color: 'text-gold bg-gold/10', title: 'Co-Host Accepted', message: txt || 'You accepted a co-host invite' };
+                              case 'co_host_declined_self':
+                                 return { icon: X, color: 'text-inkLight bg-surface', title: 'Co-Host Declined', message: txt || 'You declined a co-host invite' };
                               case 'show_reminder':
-                                 return {
-                                    icon: Clock,
-                                    color: 'text-gold bg-gold/10',
-                                    title: 'Show Reminder',
-                                    message: notification.show_title ? `${notification.show_title} is starting soon` : 'A show is starting soon'
-                                 };
+                                 return { icon: Clock, color: 'text-gold bg-gold/10', title: 'Show Reminder', message: txt || (notification.show_title ? `${notification.show_title} is starting soon` : 'A show is starting soon') };
                               case 'show_cancelled':
-                                 return {
-                                    icon: X,
-                                    color: 'text-red-500 bg-red-50',
-                                    title: 'Show Cancelled',
-                                    message: notification.show_title ? `${notification.show_title} has been cancelled` : 'A show has been cancelled'
-                                 };
+                                 return { icon: X, color: 'text-red-500 bg-red-50', title: 'Show Cancelled', message: txt || (notification.show_title ? `${notification.show_title} has been cancelled` : 'A show has been cancelled') };
                               default:
-                                 return {
-                                    icon: Bell,
-                                    color: 'text-inkLight bg-surface',
-                                    title: 'Notification',
-                                    message: notification.message || 'You have a new notification'
-                                 };
+                                 return { icon: Bell, color: 'text-inkLight bg-surface', title: 'Notification', message: txt || 'You have a new notification' };
                            }
                         };
 
@@ -2016,10 +1974,17 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                         initial={{ opacity: 0, scale: 0.98 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.98 }}
-                        className="text-center py-20 grayscale opacity-40"
+                        className="mt-2"
                      >
-                        <Settings className="w-16 h-16 mx-auto mb-4" />
-                        <h3 className="text-2xl font-bold">Preferences coming soon</h3>
+                        <CreatorPreferences
+                           profile={profile}
+                           onSaved={async () => {
+                              if (backendUser?.id && accessToken) {
+                                 const updated = await fetchUserProfile(backendUser.id, accessToken);
+                                 setProfile(updated);
+                              }
+                           }}
+                        />
                      </motion.div>
                   )}
 

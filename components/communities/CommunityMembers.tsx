@@ -134,12 +134,19 @@ const MemberRow: React.FC<MemberRowProps> = ({
 
 export const CommunityMembers: React.FC<Props> = ({
     communitySlug,
-    members,
+    members: membersProp,
     userRole,
     userMembershipId,
     onMembersChanged,
 }) => {
     const { accessToken } = useAuth();
+
+    // Guard: backend may return paginated {results: [...]} or plain array
+    const members: Membership[] = Array.isArray(membersProp)
+        ? membersProp
+        : Array.isArray((membersProp as any)?.results)
+        ? (membersProp as any).results
+        : [];
 
     const handleUpdated = (updated: Membership) => {
         onMembersChanged(members.map((m) => (m.id === updated.id ? updated : m)));

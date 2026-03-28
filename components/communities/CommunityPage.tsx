@@ -2,20 +2,22 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Loader2, Globe, Twitter, Users, Heart,
     Image as ImageIcon, X, MessageSquare,
-    Calendar, ShoppingBag, Tv, Send,
+    Calendar, ShoppingBag, Tv, Send, Activity,
 } from 'lucide-react';
 import {
     Community, Membership, MembershipRole, Show, Event, Merch,
+    FeedEvent,
     getCommunity, getCommunityFeed, getCommunityShows, getCommunityEvents,
     getCommunityMerch, getCommunityMembers, toggleCommunityFollow,
     createPost, getImageUrl,
+    getCommunityFeedEvents,
 } from '../../lib/api';
 import { useAuth } from '../../lib/AuthContext';
 import { CommunityNav } from './CommunityNav';
 import { JoinButton } from './JoinButton';
 import { CommunityMembers } from './CommunityMembers';
 
-type CommunityTab = 'feed' | 'shows' | 'events' | 'merch' | 'members';
+type CommunityTab = 'feed' | 'shows' | 'events' | 'merch' | 'members' | 'activity';
 
 interface Props {
     slug: string;
@@ -413,6 +415,7 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
     const [events, setEvents] = useState<Event[]>([]);
     const [merch, setMerch] = useState<Merch[]>([]);
     const [members, setMembers] = useState<Membership[]>([]);
+    const [activityEvents, setActivityEvents] = useState<FeedEvent[]>([]);
     const [tabLoading, setTabLoading] = useState(false);
 
     // Load community on mount
@@ -450,6 +453,10 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
                 getCommunityMerch(community.slug, token).then((d) => setMerch(d.results ?? d)),
             members: () =>
                 getCommunityMembers(community.slug, token).then(setMembers),
+            activity: () =>
+                getCommunityFeedEvents(community.slug, token).then((d) =>
+                    setActivityEvents(d.results ?? [])
+                ),
         };
 
         loaders[activeTab]().catch(console.error).finally(() => setTabLoading(false));
@@ -637,6 +644,23 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
                     showManage={canManage}
                     onManage={() => onNavigate('community-manage', community.slug)}
                 />
+                {/* Extra activity tab */}
+                <div className="flex gap-1 mt-1">
+                    {(['activity'] as const).map((tab) => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors capitalize flex items-center gap-1 ${
+                                activeTab === tab
+                                    ? 'bg-gold text-black'
+                                    : 'text-inkLight hover:text-ink'
+                            }`}
+                        >
+                            <Activity className="w-3 h-3" />
+                            {tab}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* ── Tab content ── */}
@@ -673,6 +697,32 @@ export const CommunityPage: React.FC<Props> = ({ slug, onNavigate }) => {
                                 userMembershipId={membershipId}
                                 onMembersChanged={setMembers}
                             />
+                        )}
+                        {activeTab === 'activity' && (
+                            <div className="space-y-3">
+                                {activityEvents.length === 0 ? (
+                                    <div className="text-center py-12">
+                                        <Activity className="w-7 h-7 mx-auto text-inkLight mb-2" />
+                                        <p className="text-sm font-black text-ink">No activity yet</p>
+                                        <p className="text-xs text-inkLight mt-1">Community events, games, and rewards will appear here</p>
+                                    </div>
+                                ) : (
+                                    activityEvents.map((ev) => (
+                                        <div key={ev.id} className="bg-surface border border-borderSubtle rounded-2xl p-4 flex gap-3">
+                                            <div className="w-9 h-9 rounded-xl bg-gold/10 flex items-center justify-center shrink-0">
+                                                <Activity className="w-4 h-4 text-gold" />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-black text-ink">{ev.title}</p>
+                                                {ev.body && <p className="text-xs text-inkLight mt-0.5">{ev.body}</p>}
+                                                {ev.actor && (
+                                                    <span className="text-xs text-inkLight/60 mt-1 block">{ev.actor.display_name}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
                         )}
                     </>
                 )}

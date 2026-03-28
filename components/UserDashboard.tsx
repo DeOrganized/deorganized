@@ -10,7 +10,6 @@ import { request } from '@stacks/connect';
 import { motion } from 'framer-motion';
 import { useAuth } from '../lib/AuthContext';
 import { FollowersList } from './FollowersList';
-import { MessagingInbox } from './MessagingInbox';
 import {
    fetchUserProfile,
    fetchUserFollowing,
@@ -40,7 +39,7 @@ interface UserDashboardProps {
 
 export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
    const { backendUser, accessToken, logout } = useAuth();
-   const [activeTab, setActiveTab] = useState<'history' | 'liked' | 'activity' | 'messages'>('liked');
+   const [activeTab, setActiveTab] = useState<'history' | 'liked' | 'activity'>('liked');
 
    // Followers modal
    const [showFollowersModal, setShowFollowersModal] = useState(false);
@@ -580,7 +579,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                   )}
                </div>
 
-
             </div>
 
             {/* Right Column: Content Modules */}
@@ -641,7 +639,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                         { id: 'liked', label: 'Liked Shows', icon: Heart },
                         { id: 'history', label: 'Watch History', icon: Clock },
                         { id: 'activity', label: 'Activity Feed', icon: Zap },
-                        { id: 'messages', label: 'Messages', icon: MessageSquare },
                      ].map((tab) => (
                         <button
                            key={tab.id}
@@ -809,17 +806,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                                           </div>
                                           <div className="flex-1 min-w-0">
                                              <p className="text-sm text-ink">
-                                                <span className="font-bold">{typeof item.actor === 'object' ? item.actor.username : 'Someone'}</span>
-                                                {' '}{item.notification_type === 'like' ? 'liked your' : item.notification_type === 'comment' ? 'commented on your' : item.notification_type === 'follow' ? 'started following you' : item.notification_type === 'co_host_added' ? 'added you as co-host on' : item.notification_type === 'guest_request' ? 'wants to be on your show' : item.notification_type === 'guest_accepted' ? 'accepted your guest request' : item.notification_type === 'guest_declined' ? 'declined your guest request' : item.notification_type === 'show_reminder' ? 'Show starting soon:' : item.notification_type === 'show_cancelled' ? 'Show cancelled:' : 'interacted with your'}
-                                                {item.notification_type !== 'follow' && (item.show_title || item.show_slug) && (
-                                                   <span className="font-semibold text-gold"> {item.show_title || 'show'}</span>
-                                                )}
-                                                {item.notification_type !== 'follow' && item.content_type_name === 'post' && (
-                                                   <span className="font-semibold text-gold"> post</span>
-                                                )}
-                                                {item.notification_type !== 'follow' && item.content_type_name === 'event' && (
-                                                   <span className="font-semibold text-gold"> event</span>
-                                                )}
+                                                {item.text || `${typeof item.actor === 'object' ? item.actor?.username : 'Someone'} interacted with your content`}
                                              </p>
                                              <p className="text-xs text-inkLight mt-0.5">{timeAgo(item.created_at)}</p>
                                           </div>
@@ -832,12 +819,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                               </div>
                            )}
                         </>
-                     )}
-
-                     {activeTab === 'messages' && (
-                        <div className="mt-2">
-                           <MessagingInbox />
-                        </div>
                      )}
 
                   </div>

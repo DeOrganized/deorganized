@@ -24,6 +24,9 @@ import { CommunityPage } from './components/communities/CommunityPage';
 import { CommunitiesDiscovery } from './components/communities/CommunitiesDiscovery';
 import { CreateCommunity } from './components/communities/CreateCommunity';
 import { CommunityManage } from './components/communities/CommunityManage';
+import { MessagingPage } from './pages/MessagingPage';
+
+type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps' | 'communities' | 'community-page' | 'community-manage' | 'create-community' | 'messaging';
 import { PredictionWars } from './components/PredictionWars';
 import { PredictionWarsBanner } from './components/predictionWars/PredictionWarsBanner';
 
@@ -69,6 +72,9 @@ function parseUrl(pathname: string): { page: PageView; id: string | number | nul
       if (!param) return { page: 'communities', id: null };
       if (parts[2] === 'manage') return { page: 'community-manage', id: param };
       return { page: 'community-page', id: param };
+    case 'messages':
+    case 'messaging':
+      return { page: 'messaging', id: null };
     case 'prediction-wars':
     case 'pw':
       return { page: 'prediction-wars', id: param }; // param is the coin slug if present
@@ -99,6 +105,7 @@ function pageToUrl(page: PageView, id?: string | number | null): string {
     case 'community-page': return `/c/${id}`;
     case 'community-manage': return `/c/${id}/manage`;
     case 'create-community': return '/create-community';
+    case 'messaging': return '/messaging';
     case 'prediction-wars': return id ? `/prediction-wars/${id}` : '/prediction-wars';
     case 'home':
     default: return '/';
@@ -144,8 +151,19 @@ const AppContent: React.FC = () => {
     switch (currentView) {
       case 'user-profile':
         return <UserDashboard onNavigate={handleNavigate} />;
-      case 'dashboard':
+      case 'dashboard': {
+        // Only creators and staff can access the Studio
+        const isCreator = backendUser?.role === 'creator' || backendUser?.is_staff;
+        if (!isBackendAuthenticated) {
+          // Not logged in — bounce to home
+          return <Hero onNavigate={handleNavigate} />;
+        }
+        if (!isCreator) {
+          // Logged in but not a creator — show their profile instead
+          return <UserDashboard onNavigate={handleNavigate} />;
+        }
         return <CreatorDashboard onNavigate={handleNavigate} />;
+      }
 
       // Discovery Pages
       case 'shows':
@@ -184,6 +202,8 @@ const AppContent: React.FC = () => {
         return selectedId ? <CommunityManage onNavigate={handleNavigate} slug={String(selectedId)} /> : <div>Community not found</div>;
       case 'create-community':
         return <CreateCommunity onNavigate={handleNavigate} />;
+      case 'messaging':
+        return <MessagingPage onNavigate={handleNavigate} />;
       case 'prediction-wars':
         return <PredictionWars onNavigate={handleNavigate} coin={selectedId ? String(selectedId) : undefined} />;
       case 'home':
