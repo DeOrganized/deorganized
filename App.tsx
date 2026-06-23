@@ -26,12 +26,13 @@ import { CreateCommunity } from './components/communities/CreateCommunity';
 import { CommunityManage } from './components/communities/CommunityManage';
 import { MessagingPage } from './pages/MessagingPage';
 
-type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps' | 'communities' | 'community-page' | 'community-manage' | 'create-community' | 'messaging';
 import { PredictionWars } from './components/PredictionWars';
 import { PredictionWarsBanner } from './components/predictionWars/PredictionWarsBanner';
+import { ArticleEditor } from './components/article/ArticleEditor';
+import { ArticleDetail } from './components/article/ArticleDetail';
+import { NewsIndex } from './components/article/NewsIndex';
 
-
-type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps' | 'communities' | 'community-page' | 'community-manage' | 'create-community' | 'prediction-wars';
+type PageView = 'home' | 'shows' | 'creators' | 'dashboard' | 'user-profile' | 'register' | 'show-detail' | 'creator-detail' | 'edit-profile' | 'event-calendar' | 'event-detail' | 'admin' | 'community' | 'playout-control' | 'agents' | 'daps' | 'communities' | 'community-page' | 'community-manage' | 'create-community' | 'messaging' | 'prediction-wars' | 'news' | 'article-detail' | 'article-editor';
 
 // Map URL paths to page views and extract IDs
 function parseUrl(pathname: string): { page: PageView; id: string | number | null } {
@@ -75,6 +76,12 @@ function parseUrl(pathname: string): { page: PageView; id: string | number | nul
     case 'messages':
     case 'messaging':
       return { page: 'messaging', id: null };
+    case 'news':
+      return { page: 'news', id: null };
+    case 'read':
+      return param ? { page: 'article-detail', id: param } : { page: 'news', id: null };
+    case 'write':
+      return { page: 'article-editor', id: param }; // param holds the slug when editing a draft
     case 'prediction-wars':
     case 'pw':
       return { page: 'prediction-wars', id: param }; // param is the coin slug if present
@@ -106,6 +113,9 @@ function pageToUrl(page: PageView, id?: string | number | null): string {
     case 'community-manage': return `/c/${id}/manage`;
     case 'create-community': return '/create-community';
     case 'messaging': return '/messaging';
+    case 'news': return '/news';
+    case 'article-detail': return `/read/${id}`;
+    case 'article-editor': return id ? `/write/${id}` : '/write';
     case 'prediction-wars': return id ? `/prediction-wars/${id}` : '/prediction-wars';
     case 'home':
     default: return '/';
@@ -204,6 +214,12 @@ const AppContent: React.FC = () => {
         return <CreateCommunity onNavigate={handleNavigate} />;
       case 'messaging':
         return <MessagingPage onNavigate={handleNavigate} />;
+      case 'news':
+        return <NewsIndex onNavigate={handleNavigate} />;
+      case 'article-detail':
+        return selectedId ? <ArticleDetail onNavigate={handleNavigate} slug={String(selectedId)} /> : <div>Article not found</div>;
+      case 'article-editor':
+        return <ArticleEditor onNavigate={handleNavigate} slug={selectedId ? String(selectedId) : undefined} />;
       case 'prediction-wars':
         return <PredictionWars onNavigate={handleNavigate} coin={selectedId ? String(selectedId) : undefined} />;
       case 'home':

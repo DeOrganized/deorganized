@@ -496,13 +496,21 @@ export interface News {
     excerpt: string;
     featured_image: string | null;
     category: string;
+    tags?: string;           // comma-separated (raw)
+    tags_list?: string[];    // parsed list (read-only)
     author: {
         id: number;
         username: string;
         profile_picture: string | null;
+        is_verified?: boolean;
     };
+    is_published?: boolean;
     published_at: string | null;
-    is_featured: boolean;
+    inscription_status?: 'none' | 'pending' | 'confirmed' | 'failed';
+    view_count?: number;
+    created_at?: string;
+    updated_at?: string;
+    is_featured?: boolean;
     like_count: number;
     comment_count: number;
 }
@@ -530,6 +538,126 @@ export const fetchNewsById = async (id: number): Promise<News> => {
     } catch (error) {
         console.error('Error fetching news article:', error);
         throw error;
+    }
+};
+
+// Fetch a single article by slug (the NewsViewSet uses slug as the lookup field)
+export const fetchNewsBySlug = async (slug: string): Promise<News> => {
+    const response = await fetch(`${API_BASE_URL}/news/${slug}/`);
+    if (!response.ok) throw new Error('Article not found');
+    return await response.json();
+};
+
+// ============================================
+// ARTICLE AUTHORING (News write/publish/upload)
+// ============================================
+
+export interface ArticlePayload {
+    title: string;
+    content: string;            // sanitized HTML (server re-sanitizes on save)
+    excerpt?: string;
+    category?: string;
+    tags?: string;              // comma-separated
+    featured_image_url?: string;
+    is_published?: boolean;
+}
+
+// Published articles for the public index (recent first). Explicitly filters
+// is_published=true so authenticated users don't see other people's drafts.
+export const fetchPublishedArticles = async (category?: string): Promise<News[]> => {
+    const params = new URLSearchParams({ is_published: 'true', ordering: '-published_at' });
+    if (category) params.set('category', category);
+    const response = await fetch(`${API_BASE_URL}/news/?${params.toString()}`);
+    if (!response.ok) throw new Error('Failed to fetch articles');
+    const data = await response.json();
+    return data.results || data || [];
+};
+
+// (fetchMyArticles already exists further down — current user's articles, newest first)
+
+export const createArticle = async (payload: ArticlePayload, accessToken: string): Promise<News> => {
+    const response = await fetch(`${API_BASE_URL}/news/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || error.title?.[0] || 'Failed to create article');
+    }
+    return await response.json();
+};
+
+export const updateArticle = async (
+    slug: string,
+    payload: Partial<ArticlePayload>,
+    accessToken: string
+): Promise<News> => {
+    const response = await fetch(`${API_BASE_URL}/news/${slug}/`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || 'Failed to update article');
+    }
+    return await response.json();
+};
+
+// Publish: backend validates, ensures a unique slug, sets published_at, and runs
+// the (stubbed) inscription seam. Returns the full article.
+export const publishArticle = async (slug: string, accessToken: string): Promise<News> => {
+    const response = await fetch(`${API_BASE_URL}/news/${slug}/publish/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || 'Failed to publish article');
+    }
+    return await response.json();
+};
+
+// Upload an image through Django -> Cloudinary (server-side). Returns the URL.
+export const uploadArticleImage = async (file: File, accessToken: string): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${API_BASE_URL}/media/upload/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}` }, // no Content-Type: browser sets multipart boundary
+        body: formData,
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || 'Image upload failed');
+    }
+    const data = await response.json();
+    return data.url;
+};
+
+// Lightweight user search for @-mentions (any user, not just creators)
+export interface MentionUser {
+    id: number;
+    username: string;
+    profile_picture: string | null;
+    is_verified?: boolean;
+}
+
+export const searchUsers = async (query: string, accessToken?: string): Promise<MentionUser[]> => {
+    try {
+        const headers: Record<string, string> = {};
+        if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+        const response = await fetch(
+            `${API_BASE_URL}/users/?search=${encodeURIComponent(query)}`,
+            { headers }
+        );
+        if (!response.ok) throw new Error('Failed to search users');
+        const data = await response.json();
+        return data.results || data || [];
+    } catch (error) {
+        console.error('Error searching users:', error);
+        return [];
     }
 };
 

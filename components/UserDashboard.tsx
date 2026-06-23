@@ -4,12 +4,13 @@ import {
    LogOut, Play, MoreHorizontal, MessageSquare,
    ThumbsUp, ExternalLink, CreditCard, Award, Loader2,
    UserPlus, Share2, Bell, Crown, Calendar, Users,
-   Wallet, Coins, Copy, Check, ChevronDown, ChevronUp
+   Wallet, Coins, Copy, Check, ChevronDown, ChevronUp, PenLine
 } from 'lucide-react';
 import { request } from '@stacks/connect';
 import { motion } from 'framer-motion';
 import { useAuth } from '../lib/AuthContext';
 import { FollowersList } from './FollowersList';
+import { MyArticlesPanel } from './article/MyArticlesPanel';
 import {
    fetchUserProfile,
    fetchUserFollowing,
@@ -39,7 +40,7 @@ interface UserDashboardProps {
 
 export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
    const { backendUser, accessToken, logout } = useAuth();
-   const [activeTab, setActiveTab] = useState<'history' | 'liked' | 'activity'>('liked');
+   const [activeTab, setActiveTab] = useState<'history' | 'liked' | 'activity' | 'write'>('liked');
 
    // Followers modal
    const [showFollowersModal, setShowFollowersModal] = useState(false);
@@ -636,6 +637,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                   {/* Tab Navigation */}
                   <div className="flex items-center gap-3 md:gap-6 border-b border-borderSubtle pb-4 mb-6 overflow-x-auto no-scrollbar">
                      {[
+                        { id: 'write', label: 'Write', icon: PenLine },
                         { id: 'liked', label: 'Liked Shows', icon: Heart },
                         { id: 'history', label: 'Watch History', icon: Clock },
                         { id: 'activity', label: 'Activity Feed', icon: Zap },
@@ -695,6 +697,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onNavigate }) => {
                               </div>
                            )}
                         </>
+                     )}
+
+                     {activeTab === 'write' && (
+                        <MyArticlesPanel onNavigate={onNavigate} />
                      )}
 
                      {activeTab === 'history' && (

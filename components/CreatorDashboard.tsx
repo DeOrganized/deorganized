@@ -3,7 +3,7 @@ import {
    User, Settings, DollarSign, TrendingUp, Calendar as CalendarIcon,
    Plus, Users, Bell, Check, X, Clock, Video,
    BarChart3, ArrowUpRight, MoreHorizontal, Heart, MessageSquare,
-   Trophy, Loader2, ChevronLeft, ChevronRight, Repeat, ChevronDown, Crown, Radio, Film, Zap, Tv
+   Trophy, Loader2, ChevronLeft, ChevronRight, Repeat, ChevronDown, Crown, Radio, Film, Zap, Tv, PenLine
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { addMonths, subMonths, format } from 'date-fns';
@@ -48,14 +48,15 @@ import { ContentEngine } from './ContentEngine';
 import { PlayoutEngine } from './PlayoutEngine';
 import { useToast } from './Toast';
 import { CreatorPreferences } from './CreatorDashboard/CreatorPreferences';
+import { MyArticlesPanel } from './article/MyArticlesPanel';
 
 interface CreatorDashboardProps {
    onNavigate: (page: string, id?: string | number) => void;
 }
 
-type CreatorTab = 'studio' | 'live' | 'episodes' | 'merch' | 'community' | 'messages' | 'settings' | 'content-engine' | 'playout-engine';
+type CreatorTab = 'studio' | 'live' | 'episodes' | 'merch' | 'community' | 'messages' | 'settings' | 'content-engine' | 'playout-engine' | 'write';
 
-const VALID_TABS: CreatorTab[] = ['studio', 'live', 'episodes', 'merch', 'community', 'messages', 'settings', 'content-engine', 'playout-engine'];
+const VALID_TABS: CreatorTab[] = ['studio', 'live', 'episodes', 'merch', 'community', 'messages', 'settings', 'content-engine', 'playout-engine', 'write'];
 
 function getTabFromUrl(): CreatorTab {
    const seg = window.location.pathname.split('/')[2];
@@ -573,6 +574,13 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                   <Settings className={`w-5 h-5 ${activeTab === 'settings' ? 'text-background' : ''}`} />
                   Preferences
                </button>
+               <button
+                  onClick={() => navigateToTab('write')}
+                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'write' ? 'bg-gold text-background shadow-xl' : 'text-inkLight hover:text-ink hover:bg-canvas'}`}
+               >
+                  <PenLine className={`w-5 h-5 ${activeTab === 'write' ? 'text-background' : ''}`} />
+                  Write
+               </button>
             </nav>
 
             <button
@@ -596,6 +604,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                   { key: 'content-engine' as CreatorTab, icon: Zap, label: 'Content Engine' },
                   { key: 'playout-engine' as CreatorTab, icon: Tv, label: 'Playout Engine' },
                   { key: 'settings' as CreatorTab, icon: Settings, label: 'Settings' },
+                  { key: 'write' as CreatorTab, icon: PenLine, label: 'Write' },
                ]).map(({ key, icon: Icon, label }) => (
                   <button
                      key={key}
@@ -1997,6 +2006,18 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ onNavigate }
                         className="mt-2"
                      >
                         <MessagingInbox isCreatorView={true} />
+                     </motion.div>
+                  )}
+
+                  {activeTab === 'write' && (
+                     <motion.div
+                        key="write"
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        className="mt-2"
+                     >
+                        <MyArticlesPanel onNavigate={onNavigate} />
                      </motion.div>
                   )}
                </AnimatePresence>
