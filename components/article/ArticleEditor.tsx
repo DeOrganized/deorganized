@@ -167,7 +167,9 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ onNavigate, slug }
     (async () => {
       setLoading(true);
       try {
-        const article = await fetchNewsBySlug(slug);
+        // Use the ref so we always send the latest token without adding accessToken
+        // to the deps (which would reload — and discard edits — on token rotation).
+        const article = await fetchNewsBySlug(slug, accessTokenRef.current || undefined);
         if (cancelled) return;
         setTitle(article.title || '');
         setExcerpt(article.excerpt || '');
@@ -210,7 +212,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ onNavigate, slug }
       }
       return updated.slug;
     }
-    const created = await createArticle({ ...payload, is_published: false }, accessToken);
+    const created = await createArticle(payload, accessToken);  // new articles default to draft
     if (!created?.slug) {
       // Guard against an identifier-less response so we never lose track of the
       // draft or navigate to /write/undefined.

@@ -504,7 +504,8 @@ export interface News {
         profile_picture: string | null;
         is_verified?: boolean;
     };
-    is_published?: boolean;
+    status?: 'draft' | 'published' | 'archived';
+    is_published?: boolean;   // derived: status === 'published'
     published_at: string | null;
     inscription_status?: 'none' | 'pending' | 'confirmed' | 'failed';
     view_count?: number;
@@ -542,8 +543,12 @@ export const fetchNewsById = async (id: number): Promise<News> => {
 };
 
 // Fetch a single article by slug (the NewsViewSet uses slug as the lookup field)
-export const fetchNewsBySlug = async (slug: string): Promise<News> => {
-    const response = await fetch(`${API_BASE_URL}/news/${slug}/`);
+// Pass the access token so the author can load their own non-published (draft/
+// archived) articles — anonymous/non-owner requests only see published ones.
+export const fetchNewsBySlug = async (slug: string, accessToken?: string): Promise<News> => {
+    const headers: Record<string, string> = {};
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const response = await fetch(`${API_BASE_URL}/news/${slug}/`, { headers });
     if (!response.ok) throw new Error('Article not found');
     return await response.json();
 };
@@ -559,13 +564,14 @@ export interface ArticlePayload {
     category?: string;
     tags?: string;              // comma-separated
     featured_image_url?: string;
-    is_published?: boolean;
+    // status is not set here — new articles default to 'draft' and move state
+    // only via publish/archive/republish.
 }
 
 // Published articles for the public index (recent first). Explicitly filters
-// is_published=true so authenticated users don't see other people's drafts.
+// status=published so authenticated users don't see drafts/archived.
 export const fetchPublishedArticles = async (category?: string): Promise<News[]> => {
-    const params = new URLSearchParams({ is_published: 'true', ordering: '-published_at' });
+    const params = new URLSearchParams({ status: 'published', ordering: '-published_at' });
     if (category) params.set('category', category);
     const response = await fetch(`${API_BASE_URL}/news/?${params.toString()}`);
     if (!response.ok) throw new Error('Failed to fetch articles');
@@ -619,16 +625,29 @@ export const publishArticle = async (slug: string, accessToken: string): Promise
     return await response.json();
 };
 
-// Unpublish: set is_published=false (reverse of publish). Keeps the record so it
-// can be edited/republished; only removes it from the public site.
-export const unpublishArticle = async (slug: string, accessToken: string): Promise<News> => {
-    const response = await fetch(`${API_BASE_URL}/news/${slug}/unpublish/`, {
+// Archive a published article: status -> archived. Removes it from the public
+// site but keeps the record (and its future inscription link).
+export const archiveArticle = async (slug: string, accessToken: string): Promise<News> => {
+    const response = await fetch(`${API_BASE_URL}/news/${slug}/archive/`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${accessToken}` },
     });
     if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error.detail || 'Failed to unpublish article');
+        throw new Error(error.detail || 'Failed to archive article');
+    }
+    return await response.json();
+};
+
+// Republish an archived article: status -> published.
+export const republishArticle = async (slug: string, accessToken: string): Promise<News> => {
+    const response = await fetch(`${API_BASE_URL}/news/${slug}/republish/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || 'Failed to republish article');
     }
     return await response.json();
 };
