@@ -205,9 +205,17 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ onNavigate, slug }
     const payload = buildPayload();
     if (currentSlug) {
       const updated = await updateArticle(currentSlug, payload, accessToken);
+      if (!updated?.slug) {
+        throw new Error('Save failed: the server did not return an article id. Please try again.');
+      }
       return updated.slug;
     }
     const created = await createArticle({ ...payload, is_published: false }, accessToken);
+    if (!created?.slug) {
+      // Guard against an identifier-less response so we never lose track of the
+      // draft or navigate to /write/undefined.
+      throw new Error('Save failed: the server did not return an article id. Please try again.');
+    }
     setCurrentSlug(created.slug);
     // keep the URL in sync so a refresh keeps editing this draft
     window.history.replaceState({}, '', `/write/${created.slug}`);
