@@ -619,6 +619,32 @@ export const publishArticle = async (slug: string, accessToken: string): Promise
     return await response.json();
 };
 
+// Unpublish: set is_published=false (reverse of publish). Keeps the record so it
+// can be edited/republished; only removes it from the public site.
+export const unpublishArticle = async (slug: string, accessToken: string): Promise<News> => {
+    const response = await fetch(`${API_BASE_URL}/news/${slug}/unpublish/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || 'Failed to unpublish article');
+    }
+    return await response.json();
+};
+
+// Permanently delete an article (drafts only, in the UI). Owner-gated server-side.
+export const deleteArticle = async (slug: string, accessToken: string): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/news/${slug}/`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || 'Failed to delete article');
+    }
+};
+
 // Upload an image through Django -> Cloudinary (server-side). Returns the URL.
 export const uploadArticleImage = async (file: File, accessToken: string): Promise<string> => {
     const formData = new FormData();
